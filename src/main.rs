@@ -1,3 +1,6 @@
+use cursive::Cursive;
+
 fn main() {
-    println!("Hello, world!");
+    let mut siv = Cursive::default();
+    siv.run();
 }
