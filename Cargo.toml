@@ -1,0 +1,7 @@
+[package]
+name = "rust-bullet-journal"
+version = "0.1.0"
+authors = ["Blaine Price <1wbprice@gmail.com>"]
+edition = "2018"
+
+[dependencies]
