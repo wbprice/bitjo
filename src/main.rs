@@ -3,13 +3,13 @@ use std::io::{stdout, Write};
 use termion::raw::IntoRawMode;
 use termion::{clear, color, style};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Event {
     important: bool,
     content: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Task {
     important: bool,
     completed: bool,
@@ -17,20 +17,21 @@ struct Task {
     content: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Note {
     important: bool,
     content: String,
 }
 
 trait JournalItem<T> {
-    fn print(&self);
+    fn render(&self);
     fn new(content: String) -> T;
     fn toggle_important(&self) -> T;
+    fn set_content(&self, content: String) -> T;
 }
 
 impl JournalItem<Event> for Event {
-    fn print(&self) {
+    fn render(&self) {
         println!(
             "{important} {symbol} {content}",
             important = if self.important { "*" } else { " " },
@@ -48,15 +49,21 @@ impl JournalItem<Event> for Event {
 
     fn toggle_important(&self) -> Event {
         Event {
-            content: self.content.clone(),
             important: !self.important,
-            ..Default::default()
+            ..self.clone()
+        }
+    }
+
+    fn set_content(&self, content: String) -> Event {
+        Event {
+            content: content.into(),
+            ..self.clone()
         }
     }
 }
 
 impl JournalItem<Task> for Task {
-    fn print(&self) {
+    fn render(&self) {
         println!(
             "{important} {symbol} {content}",
             important = if self.important { "*" } else { " " },
@@ -74,15 +81,21 @@ impl JournalItem<Task> for Task {
 
     fn toggle_important(&self) -> Task {
         Task {
-            content: self.content.clone(),
             important: !self.important,
-            ..Default::default()
+            ..self.clone()
+        }
+    }
+
+    fn set_content(&self, content: String) -> Task {
+        Task {
+            content: content.into(),
+            ..self.clone()
         }
     }
 }
 
 impl JournalItem<Note> for Note {
-    fn print(&self) {
+    fn render(&self) {
         println!(
             "{important} {symbol} {content}",
             important = if self.important { "*" } else { " " },
@@ -100,9 +113,15 @@ impl JournalItem<Note> for Note {
 
     fn toggle_important(&self) -> Note {
         Note {
-            content: self.content.clone(),
             important: !self.important,
-            ..Default::default()
+            ..self.clone()
+        }
+    }
+
+    fn set_content(&self, content: String) -> Note {
+        Note {
+            content: content.into(),
+            ..self.clone()
         }
     }
 }
@@ -125,14 +144,15 @@ fn main() {
     let task = Task::new("A task!".to_string());
     let mut completed_task = Task::new("A completed task!".to_string());
     completed_task.completed = true;
-    let important_task = completed_task.toggle_important();
+    let important_task = completed_task
+        .toggle_important()
+        .set_content("An important, completed task".into());
     let event = Event::new("An event!".to_string());
     let note = Note::new("A note!".to_string());
 
-    task.print();
-    completed_task.print();
-    important_task.print();
-
-    event.print();
-    note.print();
+    task.render();
+    completed_task.render();
+    important_task.render();
+    event.render();
+    note.render();
 }
