@@ -1,6 +1,4 @@
 use chrono::Local;
-use std::io::{stdout, Write};
-use termion::raw::IntoRawMode;
 use termion::{clear, color, style};
 
 #[derive(Default, Clone)]
@@ -30,6 +28,7 @@ trait JournalItem<T> {
     fn set_content(&self, content: String) -> T;
 }
 
+#[derive(Debug)]
 enum JournalItems {
     Event,
     Task,
@@ -42,6 +41,10 @@ trait Completable<T> {
 
 trait Cancellable<T> {
     fn toggle_cancellation(&self) -> T;
+}
+
+impl JournalItem<T> for JournalItems {
+
 }
 
 impl JournalItem<Event> for Event {
@@ -187,8 +190,5 @@ fn main() {
         JournalItems::Note::new("A note!".into())
     ];
 
-    for task in tasklist.iter() {
-        task.render()
-    }
-
+    dbg!(tasklist);
 }
