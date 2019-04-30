@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::Local;
 use std::io::{stdout, Write};
 use termion::raw::IntoRawMode;
 use termion::{clear, color, style};
@@ -14,7 +14,7 @@ fn main() {
         "{yellow}Today is {bold}{date}.{reset}",
         yellow = color::Fg(color::Yellow),
         bold = style::Bold,
-        date = Utc::now().format("%a, %b %e").to_string(),
+        date = Local::now().format("%a, %b %e").to_string(),
         reset = color::Fg(color::Reset)
     );
 
