@@ -7,7 +7,7 @@ struct Event {
     content: String,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct Task {
     important: bool,
     completed: bool,
@@ -21,25 +21,11 @@ struct Note {
     content: String,
 }
 
-trait JournalItem<T> {
-    fn render(&self);
-    fn new(content: String) -> T;
-    fn toggle_important(&self) -> T;
-    fn set_content(&self, content: String) -> T;
-}
-
-#[derive(Debug)]
-pub enum JournalItems {
-    Event,
-    Task,
-    Note
-}
-
 trait Journalable<T> {
     fn new(content: String) -> T;
     fn set_content(&self, content: String) -> T;
     fn toggle_important(&self) -> T;
-    fn render(&self);
+    fn render(&self) -> String;
 }
 
 trait Completable<T> : Journalable<T> {
@@ -50,10 +36,50 @@ trait Cancellable<T> : Journalable<T> {
     fn toggle_cancellation(&self) -> T;
 }
 
-impl Journalable<T> for JournalItems {
+impl Journalable<Task> for Task {
+    fn new(content: String) -> Task {
+        Task {
+            content: content.into(),
+            ..Default::default()
+        }
+    }
 
+    fn set_content(&self, content: String) -> Task {
+        Task {
+            content: content.into(),
+            ..self.clone()
+        }
+    }
+
+    fn toggle_important(&self) -> Task {
+        Task {
+            important: !self.important,
+            ..self.clone()
+        }
+    }
+
+    fn render(&self) -> String {
+        format!("{content}", content = self.content)
+    }
 }
 
+impl Cancellable<Task> for Task {
+    fn toggle_cancellation(&self) -> Task {
+        Task {
+            cancelled: !self.cancelled,
+            ..self.clone()
+        }
+    }
+}
+
+impl Completable<Task> for Task {
+    fn toggle_completed(&self) -> Task {
+        Task {
+            completed: !self.completed,
+            ..self.clone()
+        }
+    }
+}
 
 fn main() {
     println!("{}", clear::All);
@@ -70,9 +96,7 @@ fn main() {
         reset = color::Fg(color::Reset)
     );
 
-
-    let event = JournalItems::Event::new("new event".into());
-    event.render(); 
-
-    dbg!(tasklist);
+    let task = Task::new("Figure out enums".into()).toggle_important().toggle_completed();
+    println!("{}", task.render());
+    dbg!(task);
 }
