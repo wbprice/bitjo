@@ -26,6 +26,7 @@ struct Note {
 trait JournalItem<T> {
     fn print(&self);
     fn new(content: String) -> T;
+    fn toggle_important(&self) -> T;
 }
 
 impl JournalItem<Event> for Event {
@@ -41,6 +42,14 @@ impl JournalItem<Event> for Event {
     fn new(content: String) -> Event {
         Event {
             content: content,
+            ..Default::default()
+        }
+    }
+
+    fn toggle_important(&self) -> Event {
+        Event {
+            content: self.content.clone(),
+            important: !self.important,
             ..Default::default()
         }
     }
@@ -62,6 +71,14 @@ impl JournalItem<Task> for Task {
             ..Default::default()
         }
     }
+
+    fn toggle_important(&self) -> Task {
+        Task {
+            content: self.content.clone(),
+            important: !self.important,
+            ..Default::default()
+        }
+    }
 }
 
 impl JournalItem<Note> for Note {
@@ -77,6 +94,14 @@ impl JournalItem<Note> for Note {
     fn new(content: String) -> Note {
         Note {
             content: content,
+            ..Default::default()
+        }
+    }
+
+    fn toggle_important(&self) -> Note {
+        Note {
+            content: self.content.clone(),
+            important: !self.important,
             ..Default::default()
         }
     }
@@ -100,11 +125,14 @@ fn main() {
     let task = Task::new("A task!".to_string());
     let mut completed_task = Task::new("A completed task!".to_string());
     completed_task.completed = true;
+    let important_task = completed_task.toggle_important();
     let event = Event::new("An event!".to_string());
     let note = Note::new("A note!".to_string());
 
     task.print();
     completed_task.print();
+    important_task.print();
+
     event.print();
     note.print();
 }
