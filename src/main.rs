@@ -1,11 +1,6 @@
 use chrono::Local;
 use termion::{clear, color, style};
 
-#[derive(Default, Clone)]
-struct Event {
-    important: bool,
-    content: String,
-}
 
 #[derive(Default, Clone, Debug)]
 struct Task {
@@ -15,69 +10,25 @@ struct Task {
     content: String,
 }
 
-#[derive(Default, Clone)]
-struct Note {
-    important: bool,
-    content: String,
+enum JournalItems {
+    Task
 }
 
-trait Journalable<T> {
-    fn new(content: String) -> T;
-    fn set_content(&self, content: String) -> T;
-    fn toggle_important(&self) -> T;
+trait Journalable {
+    fn new(content: &'static str) -> Self;
     fn render(&self) -> String;
 }
 
-trait Completable<T> : Journalable<T> {
-    fn toggle_completed(&self) -> T;
-}
-
-trait Cancellable<T> : Journalable<T> {
-    fn toggle_cancellation(&self) -> T;
-}
-
-impl Journalable<Task> for Task {
-    fn new(content: String) -> Task {
+impl Journalable for Task {
+    fn new(content: &'static str) -> Task {
         Task {
             content: content.into(),
             ..Default::default()
         }
     }
 
-    fn set_content(&self, content: String) -> Task {
-        Task {
-            content: content.into(),
-            ..self.clone()
-        }
-    }
-
-    fn toggle_important(&self) -> Task {
-        Task {
-            important: !self.important,
-            ..self.clone()
-        }
-    }
-
     fn render(&self) -> String {
-        format!("{content}", content = self.content)
-    }
-}
-
-impl Cancellable<Task> for Task {
-    fn toggle_cancellation(&self) -> Task {
-        Task {
-            cancelled: !self.cancelled,
-            ..self.clone()
-        }
-    }
-}
-
-impl Completable<Task> for Task {
-    fn toggle_completed(&self) -> Task {
-        Task {
-            completed: !self.completed,
-            ..self.clone()
-        }
+        format!("{}", self.content)
     }
 }
 
@@ -96,7 +47,11 @@ fn main() {
         reset = color::Fg(color::Reset)
     );
 
-    let task = Task::new("Figure out enums".into()).toggle_important().toggle_completed();
-    println!("{}", task.render());
-    dbg!(task);
+    let mut memory : Vec<JournalItems> = vec![];
+    let task = Task::new("Meeting at 5:30pm".into());
+    memory.push(task);
+
+    for task in memory.iter() {
+        println!("{}", task.render());
+    }
 }
