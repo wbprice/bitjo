@@ -30,6 +30,20 @@ trait JournalItem<T> {
     fn set_content(&self, content: String) -> T;
 }
 
+enum JournalItems {
+    Event,
+    Task,
+    Note
+}
+
+trait Completable<T> {
+    fn toggle_completed(&self) -> T;
+}
+
+trait Cancellable<T> {
+    fn toggle_cancellation(&self) -> T;
+}
+
 impl JournalItem<Event> for Event {
     fn render(&self) {
         println!(
@@ -57,6 +71,15 @@ impl JournalItem<Event> for Event {
     fn set_content(&self, content: String) -> Event {
         Event {
             content: content.into(),
+            ..self.clone()
+        }
+    }
+}
+
+impl Completable<Task> for Task {
+    fn toggle_completed(&self) -> Task {
+        Task {
+            completed: !self.completed,
             ..self.clone()
         }
     }
@@ -155,4 +178,17 @@ fn main() {
     important_task.render();
     event.render();
     note.render();
+
+    let tasklist : Vec<JournalItems> = vec![
+        JournalItems::Task::new("A task!".into()),
+        JournalItems::Task::new("A completed task!".into()).toggle_completed(),
+        JournalItems::Task::new("An important, completed task!".into()).toggle_completed().toggle_important(),
+        JournalItems::Event::new("An event!".into()),
+        JournalItems::Note::new("A note!".into())
+    ];
+
+    for task in tasklist.iter() {
+        task.render()
+    }
+
 }
