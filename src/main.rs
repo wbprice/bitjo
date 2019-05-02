@@ -85,7 +85,36 @@ impl Journalable for Entries {
     }
 }
 
+#[derive(Debug, Default)]
+struct Application {
+    entries: Vec<Entries>
+}
+
 fn main() {
+
+    let application = Application {
+        entries: vec![
+            Entries::Event(Event {
+                content: "Internal Standup at 4pm".into(),
+                ..Default::default()
+            }),
+            Entries::Task(Task {
+                content: "Figure out enums".into(),
+                ..Default::default()
+            }),
+            Entries::Task(Task {
+                content: "Take out the trash".into(),
+                ..Default::default()
+            })
+            .toggle_completed()
+            .set_content("Laugh uncontrollably".into()),
+            Entries::Note(Note {
+                content: "I'm just surprised this worked".into(),
+                ..Default::default()
+            }),
+        ]
+    };
+
     println!("{}", clear::All);
     println!(
         "{green}Bit Journal v0.1.0{reset}",
@@ -100,28 +129,7 @@ fn main() {
         reset = color::Fg(color::Reset)
     );
 
-    let memory : Vec<Entries> = vec![
-        Entries::Event(Event {
-            content: "Internal Standup at 4pm".into(),
-            ..Default::default()
-        }),
-        Entries::Task(Task {
-            content: "Figure out enums".into(),
-            ..Default::default()
-        }),
-        Entries::Task(Task {
-            content: "Take out the trash".into(),
-            ..Default::default()
-        })
-        .toggle_completed()
-        .set_content("Laugh uncontrollably".into()),
-        Entries::Note(Note {
-            content: "I'm just surprised this worked".into(),
-            ..Default::default()
-        }),
-    ];
-
-    for entry in memory {
+    for entry in application.entries {
         println!("{}", entry.render());
     }
 }
