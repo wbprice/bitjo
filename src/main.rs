@@ -98,13 +98,13 @@ impl Application {
         writeln!(stdout, "{}", clear::All).unwrap();
         writeln!(
             stdout,
-            "{green}Bit Journal v0.1.0{reset}\n",
+            "{green}Bit Journal v0.1.0{reset}\r",
             green = color::Fg(color::Green),
             reset = color::Fg(color::Reset)
         ).unwrap();
         writeln!(
             stdout,
-            "{yellow}Today is {bold}{date}.{reset}\n",
+            "{yellow}Today is {bold}{date}.{reset}\r",
             yellow = color::Fg(color::Yellow),
             bold = style::Bold,
             date = Local::now().format("%a, %b %e").to_string(),
@@ -114,18 +114,19 @@ impl Application {
 
     fn render_tasks(&self, stdout: &mut RawTerminal<Stdout>) {
         for entry in self.entries.iter() {
-            writeln!(stdout, "{}\n", entry.render()).unwrap();
+            writeln!(stdout, "{}\r", entry.render()).unwrap();
         }
     }
 
     fn render_header_bar(&self, stdout: &mut RawTerminal<Stdout>) {
         writeln!(
             stdout,
-            "{background}{white}The current mode is {mode}{reset}\n",
+            "{background}{white}The current mode is {mode}{reset}{reset_bg}\r",
             background = color::Bg(color::Green),
             white = color::Fg(color::White),
             mode = self.mode.render(),
-            reset = color::Fg(color::Reset)).unwrap();
+            reset = color::Fg(color::Reset),
+            reset_bg = color::Bg(color::Reset)).unwrap();
     }
 
     fn render(&self) {
