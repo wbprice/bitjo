@@ -1,5 +1,7 @@
 use chrono::Local;
 use termion::{clear, color, style};
+use termion::raw::{IntoRawMode, RawTerminal};
+use std::io::{Write, stdout, Stdout};
 
 #[derive(Debug, Default, Clone)]
 struct Event {
@@ -92,40 +94,46 @@ struct Application {
 }
 
 impl Application {
-    fn render_status_bar(&self) {
-        println!("{}", clear::All);
-        println!(
-            "{green}Bit Journal v0.1.0{reset}",
+    fn render_status_bar(&self, stdout : &mut RawTerminal<Stdout>) {
+        writeln!(stdout, "{}", clear::All).unwrap();
+        writeln!(
+            stdout,
+            "{green}Bit Journal v0.1.0{reset}\n",
             green = color::Fg(color::Green),
             reset = color::Fg(color::Reset)
-        );
-        println!(
-            "{yellow}Today is {bold}{date}.{reset}",
+        ).unwrap();
+        writeln!(
+            stdout,
+            "{yellow}Today is {bold}{date}.{reset}\n",
             yellow = color::Fg(color::Yellow),
             bold = style::Bold,
             date = Local::now().format("%a, %b %e").to_string(),
             reset = color::Fg(color::Reset)
-        );
+        ).unwrap();
     }
 
-    fn render_tasks(&self) {
+    fn render_tasks(&self, stdout: &mut RawTerminal<Stdout>) {
         for entry in self.entries.iter() {
-            println!("{}", entry.render());
+            writeln!(stdout, "{}\n", entry.render()).unwrap();
         }
     }
 
-    fn render_header_bar(&self) {
-        println!("{background}{white}The current mode is {mode}{reset}",
+    fn render_header_bar(&self, stdout: &mut RawTerminal<Stdout>) {
+        writeln!(
+            stdout,
+            "{background}{white}The current mode is {mode}{reset}\n",
             background = color::Bg(color::Green),
             white = color::Fg(color::White),
             mode = self.mode.render(),
-            reset = color::Fg(color::Reset))
+            reset = color::Fg(color::Reset)).unwrap();
     }
 
     fn render(&self) {
-        self.render_status_bar();
-        self.render_tasks();
-        self.render_header_bar();
+        let mut stdout = stdout().into_raw_mode().unwrap();
+
+        self.render_status_bar(&mut stdout);
+        self.render_tasks(&mut stdout);
+        self.render_header_bar(&mut stdout);
     }
 }
 
