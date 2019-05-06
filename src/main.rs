@@ -70,29 +70,84 @@ impl Journalable for Entries {
     fn set_content(&self, content: String) -> Entries {
         match self {
             Entries::Task(item) => Entries::Task(Task {
-                content: content.into(),
+                content,
                 ..item.clone()
             }),
             Entries::Note(note) => Entries::Note(Note {
-                content: content.into(),
+                content,
                 ..note.clone()
             }),
             Entries::Event(event) => Entries::Event(Event {
-                content: content.into(),
+                content,
                 ..event.clone()
             })
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Application {
-    entries: Vec<Entries>
+    entries: Vec<Entries>,
+    mode: Modes
+}
+
+impl Application {
+    fn render_status_bar(&self) {
+        println!("{}", clear::All);
+        println!(
+            "{green}Bit Journal v0.1.0{reset}",
+            green = color::Fg(color::Green),
+            reset = color::Fg(color::Reset)
+        );
+        println!(
+            "{yellow}Today is {bold}{date}.{reset}",
+            yellow = color::Fg(color::Yellow),
+            bold = style::Bold,
+            date = Local::now().format("%a, %b %e").to_string(),
+            reset = color::Fg(color::Reset)
+        );
+    }
+
+    fn render_tasks(&self) {
+        for entry in self.entries.iter() {
+            println!("{}", entry.render());
+        }
+    }
+
+    fn render_header_bar(&self) {
+        println!("{background}{white}The current mode is {mode}{reset}",
+            background = color::Bg(color::Green),
+            white = color::Fg(color::White),
+            mode = self.mode.render(),
+            reset = color::Fg(color::Reset))
+    }
+
+    fn render(&self) {
+        self.render_status_bar();
+        self.render_tasks();
+        self.render_header_bar();
+    }
+}
+
+#[derive(Debug)]
+enum Modes {
+    Normal,
+    Insert
+}
+
+impl Modes {
+    fn render(&self) -> String {
+        match self {
+            Modes::Normal => "Normal".to_string(),
+            Modes::Insert => "Insert".to_string()
+        }
+    }
 }
 
 fn main() {
 
     let application = Application {
+        mode: Modes::Normal,
         entries: vec![
             Entries::Event(Event {
                 content: "Internal Standup at 4pm".into(),
@@ -115,21 +170,5 @@ fn main() {
         ]
     };
 
-    println!("{}", clear::All);
-    println!(
-        "{green}Bit Journal v0.1.0{reset}",
-        green = color::Fg(color::Green),
-        reset = color::Fg(color::Reset)
-    );
-    println!(
-        "{yellow}Today is {bold}{date}.{reset}",
-        yellow = color::Fg(color::Yellow),
-        bold = style::Bold,
-        date = Local::now().format("%a, %b %e").to_string(),
-        reset = color::Fg(color::Reset)
-    );
-
-    for entry in application.entries {
-        println!("{}", entry.render());
-    }
+    application.render();
 }
