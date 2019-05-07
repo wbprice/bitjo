@@ -2,6 +2,9 @@ use chrono::Local;
 use termion::input::TermRead;
 use termion::{clear, color, style};
 use std::io::{self, Read, Write};
+use termion::event::Key::*;
+use termion::raw::IntoRawMode;
+use termion::event::Key;
 
 
 #[derive(Debug, Default, Clone)]
@@ -96,7 +99,7 @@ struct Application<R, W: Write> {
     stdout: W
 }
 
-impl<R, W: Write> Application<R, W> {
+impl<R: Iterator<Item=Result<Key, std::io::Error>>, W: Write> Application<R, W> {
     fn render_status_bar(&mut self) {
         writeln!(self.stdout, "{}", clear::All).unwrap();
         writeln!(
@@ -141,7 +144,11 @@ impl<R, W: Write> Application<R, W> {
     }
 
     fn on_keypress(&mut self) {
-
+        let b = self.stdin.next().unwrap().unwrap();
+        match b {
+            Key::Char('u') => (),
+            _ => ()
+        }
     }
 
     // A method for painting the entire screen.
@@ -154,6 +161,11 @@ impl<R, W: Write> Application<R, W> {
     // The application loop
     fn start(&mut self) {
         self.render();
+
+        loop {
+            self.on_keypress();
+            self.render();
+        }
     }
 }
 
@@ -181,6 +193,8 @@ fn main() {
     let mut stdout = stdout.lock();
     let stdin = io::stdin();
     let stdin = stdin.lock();
+    let stdout = stdout.into_raw_mode().unwrap();
+
 
     let mut application = Application {
         mode: Modes::Normal,
