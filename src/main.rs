@@ -1,7 +1,10 @@
 use chrono::Local;
+use termion::event::Key;
+use termion::input::TermRead;
 use termion::{clear, color, style};
 use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Write, stdout, Stdout};
+use std::io::{Write, stdout, stdin, Stdout};
+use std::process::exit;
 
 #[derive(Debug, Default, Clone)]
 struct Event {
@@ -131,10 +134,20 @@ impl Application {
 
     fn render(&self) {
         let mut stdout = stdout().into_raw_mode().unwrap();
+        let stdin = stdin();
 
         self.render_status_bar(&mut stdout);
         self.render_tasks(&mut stdout);
         self.render_header_bar(&mut stdout);
+
+        for c in stdin.keys() {
+            match c.unwrap() {
+                Key::Char('q') => exit(0),
+                Key::Char('o') => println!("switch modes"),
+                Key::Esc => println!("switch modes back"),
+                _ => ()
+            }
+        }
     }
 }
 
