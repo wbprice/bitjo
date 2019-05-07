@@ -131,7 +131,15 @@ impl Application {
             reset_bg = color::Bg(color::Reset)).unwrap();
     }
 
-    fn render(&self) {
+    fn switch_mode(&mut self, mode: Modes) {
+        match mode {
+            Modes::Normal => { self.mode = Modes::Normal; },
+            Modes::Insert => { self.mode = Modes::Insert; },
+            _ => ()
+        }
+    }
+
+    fn render(&mut self) {
         let mut stdout = stdout().into_raw_mode().unwrap();
         let stdin = stdin();
 
@@ -140,11 +148,36 @@ impl Application {
         self.render_header_bar(&mut stdout);
 
         for c in stdin.keys() {
-            match c.unwrap() {
-                Key::Char('o') => println!("switch modes"),
-                Key::Esc => println!("switch modes back"),
-                _ => ()
+            // Handle various application mode inputs
+            match self.mode {
+                // Handle Insert inputs
+                Modes::Normal => {
+                    match c.unwrap() {
+                        Key::Char('o') => { self.switch_mode(Modes::Insert) },
+                        Key::Esc => { break; }
+                        _ => ()
+                    }
+                },
+                // Handle Insert inputs
+                Modes::Insert => {
+                    match c.unwrap() {
+                        Key::Esc => { self.switch_mode(Modes::Normal) },
+                        _ => ()
+                    }
+                },
+                // Handle Command inputs
+                Modes::Command => {
+                    match c.unwrap() {
+                        Key::Esc => { self.switch_mode(Modes::Normal) },
+                        _ => ()
+                    }
+                }
             }
+
+            // Rerender
+            self.render_status_bar(&mut stdout);
+            self.render_tasks(&mut stdout);
+            self.render_header_bar(&mut stdout);
         }
     }
 }
@@ -152,21 +185,22 @@ impl Application {
 #[derive(Debug)]
 enum Modes {
     Normal,
-    Insert
+    Insert,
+    Command
 }
 
 impl Modes {
     fn render(&self) -> String {
         match self {
             Modes::Normal => "Normal".to_string(),
-            Modes::Insert => "Insert".to_string()
+            Modes::Insert => "Insert".to_string(),
+            Modes::Command => "Command".to_string()
         }
     }
 }
 
 fn main() {
-
-    let application = Application {
+    let mut application = Application {
         mode: Modes::Normal,
         entries: vec![
             Entries::Event(Event {
