@@ -1,9 +1,8 @@
 use chrono::Local;
-use termion::event::Key;
 use termion::input::TermRead;
-use termion::{clear, color, style, async_stdin};
-use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Write, Stdout, stdout, stdin, Read};
+use termion::{clear, color, style};
+use std::io::{self, Read, Write};
+
 
 #[derive(Debug, Default, Clone)]
 struct Event {
@@ -90,14 +89,14 @@ impl Journalable for Entries {
 }
 
 #[derive(Debug)]
-struct Application<Reader, Writer> {
+struct Application<R, W: Write> {
     entries: Vec<Entries>,
     mode: Modes,
-    stdin: Reader,
-    stdout: Writer
+    stdin: R,
+    stdout: W
 }
 
-impl<R: Read, W: Write> Application<R, W> {
+impl<R, W: Write> Application<R, W> {
     fn render_status_bar(&mut self) {
         writeln!(self.stdout, "{}", clear::All).unwrap();
         writeln!(
@@ -142,7 +141,7 @@ impl<R: Read, W: Write> Application<R, W> {
     }
 
     fn on_keypress(&mut self) {
-        
+
     }
 
     // A method for painting the entire screen.
@@ -154,11 +153,9 @@ impl<R: Read, W: Write> Application<R, W> {
 
     // The application loop
     fn start(&mut self) {
-        
-        if !self.on_keypress(&mut self) {
-
+        loop {
+            self.render();
         }
-
     }
 }
 
@@ -179,16 +176,18 @@ impl Modes {
     }
 }
 
+
 fn main() {
 
-    let stdout = stdout();
-    let stdout = stdout.lock().into_raw_mode().unwrap();
-    let stdin = async_stdin();
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    let stdin = io::stdin();
+    let stdin = stdin.lock();
 
     let mut application = Application {
         mode: Modes::Normal,
-        stdin,
-        stdout,
+        stdin: stdin.keys(),
+        stdout: stdout,
         entries: vec![
             Entries::Event(Event {
                 content: "Internal Standup at 4pm".into(),
@@ -212,4 +211,5 @@ fn main() {
     };
 
     application.start();
+
 }
