@@ -4,7 +4,6 @@ use termion::input::TermRead;
 use termion::{clear, color, style};
 use termion::raw::{IntoRawMode, RawTerminal};
 use std::io::{Write, stdout, stdin, Stdout};
-use std::process::exit;
 
 #[derive(Debug, Default, Clone)]
 struct Event {
@@ -142,7 +141,6 @@ impl Application {
 
         for c in stdin.keys() {
             match c.unwrap() {
-                Key::Char('q') => exit(0),
                 Key::Char('o') => println!("switch modes"),
                 Key::Esc => println!("switch modes back"),
                 _ => ()
