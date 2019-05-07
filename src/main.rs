@@ -1,9 +1,9 @@
 use chrono::Local;
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::{clear, color, style};
+use termion::{clear, color, style, async_stdin};
 use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Write, stdout, stdin, Stdout};
+use std::io::{Write, Stdout, stdout, stdin, Read};
 
 #[derive(Debug, Default, Clone)]
 struct Event {
@@ -90,22 +90,24 @@ impl Journalable for Entries {
 }
 
 #[derive(Debug)]
-struct Application {
+struct Application<Reader, Writer> {
     entries: Vec<Entries>,
-    mode: Modes
+    mode: Modes,
+    stdin: Reader,
+    stdout: Writer
 }
 
-impl Application {
-    fn render_status_bar(&self, stdout : &mut RawTerminal<Stdout>) {
-        writeln!(stdout, "{}", clear::All).unwrap();
+impl<R: Read, W: Write> Application<R, W> {
+    fn render_status_bar(&mut self) {
+        writeln!(self.stdout, "{}", clear::All).unwrap();
         writeln!(
-            stdout,
+            self.stdout,
             "{green}Bit Journal v0.1.0{reset}\r",
             green = color::Fg(color::Green),
             reset = color::Fg(color::Reset)
         ).unwrap();
         writeln!(
-            stdout,
+            self.stdout,
             "{yellow}Today is {bold}{date}.{reset}\r",
             yellow = color::Fg(color::Yellow),
             bold = style::Bold,
@@ -114,15 +116,15 @@ impl Application {
         ).unwrap();
     }
 
-    fn render_tasks(&self, stdout: &mut RawTerminal<Stdout>) {
+    fn render_tasks(&mut self) {
         for entry in self.entries.iter() {
-            writeln!(stdout, "{}\r", entry.render()).unwrap();
+            writeln!(self.stdout, "{}\r", entry.render()).unwrap();
         }
     }
 
-    fn render_header_bar(&self, stdout: &mut RawTerminal<Stdout>) {
+    fn render_header_bar(&mut self) {
         writeln!(
-            stdout,
+            self.stdout,
             "{background}{white}The current mode is {mode}{reset}{reset_bg}\r",
             background = color::Bg(color::Green),
             white = color::Fg(color::White),
@@ -139,46 +141,24 @@ impl Application {
         }
     }
 
+    fn on_keypress(&mut self) {
+        
+    }
+
+    // A method for painting the entire screen.
     fn render(&mut self) {
-        let mut stdout = stdout().into_raw_mode().unwrap();
-        let stdin = stdin();
+        self.render_status_bar();
+        self.render_tasks();
+        self.render_header_bar();
+    }
 
-        self.render_status_bar(&mut stdout);
-        self.render_tasks(&mut stdout);
-        self.render_header_bar(&mut stdout);
+    // The application loop
+    fn start(&mut self) {
+        
+        if !self.on_keypress(&mut self) {
 
-        for c in stdin.keys() {
-            // Handle various application mode inputs
-            match self.mode {
-                // Handle Insert inputs
-                Modes::Normal => {
-                    match c.unwrap() {
-                        Key::Char('o') => { self.switch_mode(Modes::Insert) },
-                        Key::Esc => { break; }
-                        _ => ()
-                    }
-                },
-                // Handle Insert inputs
-                Modes::Insert => {
-                    match c.unwrap() {
-                        Key::Esc => { self.switch_mode(Modes::Normal) },
-                        _ => ()
-                    }
-                },
-                // Handle Command inputs
-                Modes::Command => {
-                    match c.unwrap() {
-                        Key::Esc => { self.switch_mode(Modes::Normal) },
-                        _ => ()
-                    }
-                }
-            }
-
-            // Rerender
-            self.render_status_bar(&mut stdout);
-            self.render_tasks(&mut stdout);
-            self.render_header_bar(&mut stdout);
         }
+
     }
 }
 
@@ -200,8 +180,15 @@ impl Modes {
 }
 
 fn main() {
+
+    let stdout = stdout();
+    let stdout = stdout.lock().into_raw_mode().unwrap();
+    let stdin = async_stdin();
+
     let mut application = Application {
         mode: Modes::Normal,
+        stdin,
+        stdout,
         entries: vec![
             Entries::Event(Event {
                 content: "Internal Standup at 4pm".into(),
@@ -224,5 +211,5 @@ fn main() {
         ]
     };
 
-    application.render();
+    application.start();
 }
