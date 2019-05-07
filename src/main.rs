@@ -153,9 +153,7 @@ impl<R, W: Write> Application<R, W> {
 
     // The application loop
     fn start(&mut self) {
-        loop {
-            self.render();
-        }
+        self.render();
     }
 }
 
