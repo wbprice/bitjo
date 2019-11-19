@@ -8,7 +8,7 @@ use termion::{clear, color, style};
 #[structopt(rename_all = "kebab-case")]
 struct Opt {
     #[structopt(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -239,26 +239,28 @@ fn main() {
     ];
 
     // Handle input!
-    match opt.command {
-        Command::Add { entry_type } => match entry_type {
-            EntryType::Event { text } => {
-                entries.push(Entries::Event(Event::new(text)));
+    if let Some(command) = opt.command {
+        match command {
+            Command::Add { entry_type } => match entry_type {
+                EntryType::Event { text } => {
+                    entries.push(Entries::Event(Event::new(text)));
+                }
+                EntryType::Note { text } => {
+                    entries.push(Entries::Note(Note::new(text)));
+                }
+                EntryType::Task { text } => {
+                    entries.push(Entries::Task(Task::new(text)));
+                }
+            },
+            Command::Cancel => {
+                unimplemented!();
             }
-            EntryType::Note { text } => {
-                entries.push(Entries::Note(Note::new(text)));
+            Command::Complete => {
+                unimplemented!();
             }
-            EntryType::Task { text } => {
-                entries.push(Entries::Task(Task::new(text)));
+            Command::Remove => {
+                unimplemented!();
             }
-        },
-        Command::Cancel => {
-            unimplemented!();
-        }
-        Command::Complete => {
-            unimplemented!();
-        }
-        Command::Remove => {
-            unimplemented!();
         }
     }
 
