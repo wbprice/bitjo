@@ -1,12 +1,48 @@
 use chrono::Local;
-use termion::{clear, color, style};
+use std::io::{stdout, Stdout, Write};
+use structopt::StructOpt;
 use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{Write, stdout, Stdout};
+use termion::{clear, color, style};
+
+#[derive(Debug, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+struct Opt {
+    #[structopt(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+enum Command {
+    Add {
+        #[structopt(subcommand)]
+        entry_type: EntryType,
+    },
+    Complete,
+    Cancel,
+    Remove,
+}
+
+#[derive(Debug, StructOpt)]
+enum EntryType {
+    Task { text: String },
+    Note { text: String },
+    Event { text: String },
+}
 
 #[derive(Debug, Default, Clone)]
 struct Event {
     important: bool,
     content: String,
+}
+
+impl Event {
+    fn new(content: String) -> Event {
+        Event {
+            content,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -17,17 +53,35 @@ struct Task {
     content: String,
 }
 
+impl Task {
+    fn new(content: String) -> Task {
+        Task {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 struct Note {
     important: bool,
     content: String,
 }
 
+impl Note {
+    fn new(content: String) -> Note {
+        Note {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug)]
 enum Entries {
     Event(Event),
     Task(Task),
-    Note(Note)
+    Note(Note),
 }
 
 trait Journalable {
@@ -39,18 +93,24 @@ trait Journalable {
 impl Journalable for Entries {
     fn render(&self) -> String {
         match self {
-            Entries::Event(item) => format!("{important} {symbol} {content}",
-                important = if item.important { "*" } else {" "},
+            Entries::Event(item) => format!(
+                "{important} {symbol} {content}",
+                important = if item.important { "*" } else { " " },
                 symbol = "\u{26AC}",
-                content = item.content),
-            Entries::Task(item) => format!("{important} {symbol} {content}",
-                important = if item.important { "*" } else {" "},
+                content = item.content
+            ),
+            Entries::Task(item) => format!(
+                "{important} {symbol} {content}",
+                important = if item.important { "*" } else { " " },
                 symbol = if item.completed { "X" } else { "\u{2022}" },
-                content = item.content),
-            Entries::Note(item) => format!("{important} {symbol} {content}",
-                important = if item.important { "*" } else {" "},
+                content = item.content
+            ),
+            Entries::Note(item) => format!(
+                "{important} {symbol} {content}",
+                important = if item.important { "*" } else { " " },
                 symbol = "-",
-                content = item.content),
+                content = item.content
+            ),
         }
     }
 
@@ -60,12 +120,8 @@ impl Journalable for Entries {
                 completed: !item.completed,
                 ..item.clone()
             }),
-            Entries::Note(note) => Entries::Note(Note {
-                ..note.clone()
-            }),
-            Entries::Event(event) => Entries::Event(Event {
-                ..event.clone()
-            })
+            Entries::Note(note) => Entries::Note(Note { ..note.clone() }),
+            Entries::Event(event) => Entries::Event(Event { ..event.clone() }),
         }
     }
 
@@ -82,7 +138,7 @@ impl Journalable for Entries {
             Entries::Event(event) => Entries::Event(Event {
                 content,
                 ..event.clone()
-            })
+            }),
         }
     }
 }
@@ -90,18 +146,19 @@ impl Journalable for Entries {
 #[derive(Debug)]
 struct Application {
     entries: Vec<Entries>,
-    mode: Modes
+    mode: Modes,
 }
 
 impl Application {
-    fn render_status_bar(&self, stdout : &mut RawTerminal<Stdout>) {
+    fn render_status_bar(&self, stdout: &mut RawTerminal<Stdout>) {
         writeln!(stdout, "{}", clear::All).unwrap();
         writeln!(
             stdout,
             "{green}Bit Journal v0.1.0{reset}\r",
             green = color::Fg(color::Green),
             reset = color::Fg(color::Reset)
-        ).unwrap();
+        )
+        .unwrap();
         writeln!(
             stdout,
             "{yellow}Today is {bold}{date}.{reset}\r",
@@ -109,7 +166,8 @@ impl Application {
             bold = style::Bold,
             date = Local::now().format("%a, %b %e").to_string(),
             reset = color::Fg(color::Reset)
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     fn render_tasks(&self, stdout: &mut RawTerminal<Stdout>) {
@@ -126,7 +184,9 @@ impl Application {
             white = color::Fg(color::White),
             mode = self.mode.render(),
             reset = color::Fg(color::Reset),
-            reset_bg = color::Bg(color::Reset)).unwrap();
+            reset_bg = color::Bg(color::Reset)
+        )
+        .unwrap();
     }
 
     fn render(&self) {
@@ -141,42 +201,72 @@ impl Application {
 #[derive(Debug)]
 enum Modes {
     Normal,
-    Insert
+    Insert,
 }
 
 impl Modes {
     fn render(&self) -> String {
         match self {
             Modes::Normal => "Normal".to_string(),
-            Modes::Insert => "Insert".to_string()
+            Modes::Insert => "Insert".to_string(),
         }
     }
 }
 
 fn main() {
+    let opt = Opt::from_args();
+
+    // Stubbing out behavior where this is serialized and persisted to a backend
+    let mut entries = vec![
+        Entries::Event(Event {
+            content: "Internal Standup at 4pm".into(),
+            ..Default::default()
+        }),
+        Entries::Task(Task {
+            content: "Figure out enums".into(),
+            ..Default::default()
+        }),
+        Entries::Task(Task {
+            content: "Take out the trash".into(),
+            ..Default::default()
+        })
+        .toggle_completed()
+        .set_content("Laugh uncontrollably".into()),
+        Entries::Note(Note {
+            content: "I'm just surprised this worked".into(),
+            ..Default::default()
+        }),
+    ];
+
+    // Handle input!
+    if let Some(command) = opt.command {
+        match command {
+            Command::Add { entry_type } => match entry_type {
+                EntryType::Event { text } => {
+                    entries.push(Entries::Event(Event::new(text)));
+                }
+                EntryType::Note { text } => {
+                    entries.push(Entries::Note(Note::new(text)));
+                }
+                EntryType::Task { text } => {
+                    entries.push(Entries::Task(Task::new(text)));
+                }
+            },
+            Command::Cancel => {
+                unimplemented!();
+            }
+            Command::Complete => {
+                unimplemented!();
+            }
+            Command::Remove => {
+                unimplemented!();
+            }
+        }
+    }
 
     let application = Application {
         mode: Modes::Normal,
-        entries: vec![
-            Entries::Event(Event {
-                content: "Internal Standup at 4pm".into(),
-                ..Default::default()
-            }),
-            Entries::Task(Task {
-                content: "Figure out enums".into(),
-                ..Default::default()
-            }),
-            Entries::Task(Task {
-                content: "Take out the trash".into(),
-                ..Default::default()
-            })
-            .toggle_completed()
-            .set_content("Laugh uncontrollably".into()),
-            Entries::Note(Note {
-                content: "I'm just surprised this worked".into(),
-                ..Default::default()
-            }),
-        ]
+        entries,
     };
 
     application.render();

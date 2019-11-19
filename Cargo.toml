@@ -5,5 +5,6 @@ authors = ["Blaine Price <1wbprice@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-termion = "*"
+termion = "1.5.3"
 chrono = "0.4"
+structopt = "0.3.4"
