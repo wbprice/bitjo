@@ -15,7 +15,6 @@ struct Opt {
 #[structopt(rename_all = "kebab-case")]
 enum Command {
     Add {
-        text: String,
         #[structopt(subcommand)]
         entry_type: EntryType,
     },
@@ -26,15 +25,24 @@ enum Command {
 
 #[derive(Debug, StructOpt)]
 enum EntryType {
-    Task,
-    Note,
-    Event,
+    Task { text: String },
+    Note { text: String },
+    Event { text: String },
 }
 
 #[derive(Debug, Default, Clone)]
 struct Event {
     important: bool,
     content: String,
+}
+
+impl Event {
+    fn new(content: String) -> Event {
+        Event {
+            content,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -45,10 +53,28 @@ struct Task {
     content: String,
 }
 
+impl Task {
+    fn new(content: String) -> Task {
+        Task {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 struct Note {
     important: bool,
     content: String,
+}
+
+impl Note {
+    fn new(content: String) -> Note {
+        Note {
+            content,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -212,12 +238,34 @@ fn main() {
         }),
     ];
 
+    // Handle input!
+    match opt.command {
+        Command::Add { entry_type } => match entry_type {
+            EntryType::Event { text } => {
+                entries.push(Entries::Event(Event::new(text)));
+            }
+            EntryType::Note { text } => {
+                entries.push(Entries::Note(Note::new(text)));
+            }
+            EntryType::Task { text } => {
+                entries.push(Entries::Task(Task::new(text)));
+            }
+        },
+        Command::Cancel => {
+            unimplemented!();
+        }
+        Command::Complete => {
+            unimplemented!();
+        }
+        Command::Remove => {
+            unimplemented!();
+        }
+    }
+
     let application = Application {
         mode: Modes::Normal,
         entries,
     };
 
     application.render();
-
-    dbg!(opt);
 }
