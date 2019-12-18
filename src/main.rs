@@ -4,6 +4,23 @@ use structopt::StructOpt;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::{clear, color, style};
 
+mod services;
+mod models;
+
+use crate::{
+    services::{
+        InMemoryJournal
+    },
+    models::{
+        Task,
+        Event,
+        Note,
+        EntryType,
+        Entries,
+        JournalEntry
+    }
+};
+
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
 struct Opt {
@@ -21,126 +38,6 @@ enum Command {
     Complete,
     Cancel,
     Remove,
-}
-
-#[derive(Debug, StructOpt)]
-enum EntryType {
-    Task { text: String },
-    Note { text: String },
-    Event { text: String },
-}
-
-#[derive(Debug, Default, Clone)]
-struct Event {
-    important: bool,
-    content: String,
-}
-
-impl Event {
-    fn new(content: String) -> Event {
-        Event {
-            content,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-struct Task {
-    important: bool,
-    completed: bool,
-    cancelled: bool,
-    content: String,
-}
-
-impl Task {
-    fn new(content: String) -> Task {
-        Task {
-            content,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-struct Note {
-    important: bool,
-    content: String,
-}
-
-impl Note {
-    fn new(content: String) -> Note {
-        Note {
-            content,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug)]
-enum Entries {
-    Event(Event),
-    Task(Task),
-    Note(Note),
-}
-
-trait Journalable {
-    fn render(&self) -> String;
-    fn toggle_completed(&self) -> Entries;
-    fn set_content(&self, content: String) -> Entries;
-}
-
-impl Journalable for Entries {
-    fn render(&self) -> String {
-        match self {
-            Entries::Event(item) => format!(
-                "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
-                symbol = "\u{26AC}",
-                content = item.content
-            ),
-            Entries::Task(item) => format!(
-                "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
-                symbol = if item.completed { "X" } else { "\u{2022}" },
-                content = item.content
-            ),
-            Entries::Note(item) => format!(
-                "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
-                symbol = "-",
-                content = item.content
-            ),
-        }
-    }
-
-    fn toggle_completed(&self) -> Entries {
-        match self {
-            Entries::Task(item) => Entries::Task(Task {
-                completed: !item.completed,
-                ..item.clone()
-            }),
-            Entries::Note(note) => Entries::Note(Note { ..note.clone() }),
-            Entries::Event(event) => Entries::Event(Event { ..event.clone() }),
-        }
-    }
-
-    fn set_content(&self, content: String) -> Entries {
-        match self {
-            Entries::Task(item) => Entries::Task(Task {
-                content,
-                ..item.clone()
-            }),
-            Entries::Note(note) => Entries::Note(Note {
-                content,
-                ..note.clone()
-            }),
-            Entries::Event(event) => Entries::Event(Event {
-                content,
-                ..event.clone()
-            }),
-        }
-    }
 }
 
 #[derive(Debug)]
