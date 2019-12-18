@@ -1,5 +1,6 @@
 use crate::models::{
-    Entries
+    Entries,
+    Note
 };
 
 pub trait Journalable {

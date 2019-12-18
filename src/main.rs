@@ -9,7 +9,8 @@ mod models;
 
 use crate::{
     services::{
-        InMemoryJournal
+        InMemoryJournal,
+        Journalable
     },
     models::{
         Task,
@@ -41,12 +42,12 @@ enum Command {
 }
 
 #[derive(Debug)]
-struct Application {
-    entries: Vec<Entries>,
+struct Application<'a> {
+    entries: &'a Vec<Entries>,
     mode: Modes,
 }
 
-impl Application {
+impl<'a> Application<'a> {
     fn render_status_bar(&self, stdout: &mut RawTerminal<Stdout>) {
         writeln!(stdout, "{}", clear::All).unwrap();
         writeln!(
@@ -114,39 +115,39 @@ fn main() {
     let opt = Opt::from_args();
 
     // Stubbing out behavior where this is serialized and persisted to a backend
-    let mut entries = vec![
+    let mut journal = InMemoryJournal::new();
+
+    journal.append(
         Entries::Event(Event {
             content: "Internal Standup at 4pm".into(),
             ..Default::default()
-        }),
+        })
+    );
+    journal.append(
         Entries::Task(Task {
             content: "Figure out enums".into(),
             ..Default::default()
-        }),
-        Entries::Task(Task {
-            content: "Take out the trash".into(),
-            ..Default::default()
         })
-        .toggle_completed()
-        .set_content("Laugh uncontrollably".into()),
+    );
+    journal.append(
         Entries::Note(Note {
             content: "I'm just surprised this worked".into(),
             ..Default::default()
-        }),
-    ];
+        })
+    );
 
     // Handle input!
     if let Some(command) = opt.command {
         match command {
             Command::Add { entry_type } => match entry_type {
                 EntryType::Event { text } => {
-                    entries.push(Entries::Event(Event::new(text)));
+                    journal.append(Entries::Event(Event::new(text)));
                 }
                 EntryType::Note { text } => {
-                    entries.push(Entries::Note(Note::new(text)));
+                    journal.append(Entries::Note(Note::new(text)));
                 }
                 EntryType::Task { text } => {
-                    entries.push(Entries::Task(Task::new(text)));
+                    journal.append(Entries::Task(Task::new(text)));
                 }
             },
             Command::Cancel => {
@@ -163,7 +164,7 @@ fn main() {
 
     let application = Application {
         mode: Modes::Normal,
-        entries,
+        entries: journal.list(),
     };
 
     application.render();

@@ -1,5 +1,8 @@
 mod journal;
 
 pub use self::{
-    journal::InMemoryJournal
+    journal::{
+        InMemoryJournal,
+        Journalable
+    }
 };
