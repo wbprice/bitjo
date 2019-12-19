@@ -95,7 +95,10 @@ impl Journalable for LocalDiskJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
+    use std::fs::{
+        File,
+        remove_file
+    };
     use crate::models::{Event, Note};
 
     #[test]
@@ -122,6 +125,7 @@ mod tests {
         let file = File::open(&journal.path);
         assert_eq!(entries.len(), 0);
         assert!(file.is_ok());
+        remove_file(&journal.path).unwrap();
     }
 
     #[test]
@@ -137,5 +141,6 @@ mod tests {
         let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(disk_entries.len(), 1);
+        remove_file(&journal.path).unwrap();
     }
 }
