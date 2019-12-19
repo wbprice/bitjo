@@ -76,30 +76,65 @@ pub trait JournalEntry {
 impl JournalEntry for Entries {
     fn render(&self) -> String {
         match self {
-            Entries::Event(item) => format!(
-                "{important} {crossed} {symbol} {content} {reset}",
-                important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
-                symbol = "\u{26AC}",
-                content = item.content,
-                reset = Reset
-            ),
-            Entries::Task(item) => format!(
-                "{important} {crossed} {symbol} {content} {reset}",
-                important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
-                symbol = if item.completed { "X" } else { "\u{2022}" },
-                content = item.content,
-                reset = Reset
-            ),
-            Entries::Note(item) => format!(
-                "{important} {crossed} {symbol} {content} {reset}",
-                important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
-                symbol = "-",
-                content = item.content,
-                reset = Reset
-            ),
+            Entries::Event(item) => {
+                if item.cancelled {
+                    return format!(
+                        "{important}{crossed} {symbol} {content} {reset}",
+                        important = if item.important { "*" } else { " " },
+                        crossed = style::CrossedOut,
+                        symbol = "\u{26AC}",
+                        content = item.content,
+                        reset = Reset
+                    )
+                }
+                format!(
+                    "{important} {symbol} {content} {reset}",
+                    important = if item.important { "*" } else { " " },
+                    symbol = "\u{26AC}",
+                    content = item.content,
+                    reset = Reset
+                )
+
+            },
+            Entries::Task(item) => {
+                if item.cancelled {
+                    return format!(
+                        "{important}{crossed} {symbol} {content} {reset}",
+                        important = if item.important { "*" } else { " " },
+                        crossed = style::CrossedOut,
+                        symbol = if item.completed { "X" } else { "\u{2022}" },
+                        content = item.content,
+                        reset = Reset
+                    )
+                }
+                format!(
+                    "{important} {symbol} {content} {reset}",
+                    important = if item.important { "*" } else { " " },
+                    symbol = if item.completed { "X" } else { "\u{2022}" },
+                    content = item.content,
+                    reset = Reset
+                )
+            },
+            Entries::Note(item) => { 
+                if item.cancelled {
+                    return format!(
+                        "{important}{crossed} {symbol} {content} {reset}",
+                        important = if item.important { "*" } else { " " },
+                        crossed = style::CrossedOut,
+                        symbol = "-",
+                        content = item.content,
+                        reset = Reset
+                    )
+                }
+
+                format!(
+                    "{important} {symbol} {content} {reset}",
+                    important = if item.important { "*" } else { " " },
+                    symbol = "-",
+                    content = item.content,
+                    reset = Reset
+                )
+            }
         }
     }
 
@@ -134,7 +169,7 @@ impl JournalEntry for Entries {
     fn toggle_cancelled(&self) -> Entries {
         match self {
             Entries::Task(item) => Entries::Task(Task {
-                cancelled: !item.completed,
+                cancelled: !item.cancelled,
                 ..item.clone()
             }),
             Entries::Note(note) => Entries::Note(Note { 
