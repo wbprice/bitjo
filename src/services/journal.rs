@@ -138,8 +138,19 @@ mod tests {
     }
 
     #[test]
+    fn in_memory_journal_removes() {
+        let mut journal = InMemoryJournal::new(None);
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        assert_eq!(journal.list().len(), 1);
+        journal.remove(0);
+        assert_eq!(journal.list().len(), 0);
+    }
+
+    #[test]
     fn on_disk_journal_created() {
-        let journal = LocalDiskJournal::new(Some("test1".to_string()));
+        let journal = LocalDiskJournal::new(Some("creation-test".to_string()));
         let entries = journal.list();
         let file = File::open(&journal.path);
         assert_eq!(entries.len(), 0);
@@ -149,7 +160,7 @@ mod tests {
 
     #[test]
     fn on_disk_journal_appends() {
-        let mut journal = LocalDiskJournal::new(Some("test2".to_string()));
+        let mut journal = LocalDiskJournal::new(Some("append-test".to_string()));
         journal.append(Entries::Note(Note::new(
             "Learn how to write unit tests".to_string(),
         )));
@@ -160,6 +171,37 @@ mod tests {
         let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(disk_entries.len(), 1);
+        remove_file(&journal.path).unwrap();
+    }
+
+    #[test]
+    fn on_disk_journal_removes() {
+        let path = "remove-test".to_string();
+        let mut journal = LocalDiskJournal::new(Some(path));
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write integration tests".to_string(),
+        )));
+
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+        assert_eq!(journal.list().len(), 2);
+        assert_eq!(disk_entries.len(), 2);
+
+        journal.remove(0);
+        let mut file2 = File::open(&journal.path).unwrap();
+        let mut contents2 = String::new();
+        file2.read_to_string(&mut contents2).unwrap();
+
+        assert_eq!(journal.list().len(), 1);
+        let disk_entries2 : Vec<Entries> = serde_yaml::from_str(&contents2).unwrap();
+        assert_eq!(disk_entries2.len(), 1);
+
         remove_file(&journal.path).unwrap();
     }
 }
