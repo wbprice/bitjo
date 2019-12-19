@@ -69,7 +69,7 @@ impl Journalable for LocalDiskJournal {
     fn append(&mut self, entry: Entries) {
         self.entries.push(entry);
         // Update the file.
-        let yaml = serde_yaml::to_string(&self.entries).unwrap();
+        let yaml = format!("{}\n", serde_yaml::to_string(&self.entries).unwrap());
         self.file.write_all(&yaml.as_bytes()).unwrap();
     }
 
