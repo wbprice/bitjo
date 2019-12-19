@@ -90,7 +90,7 @@ impl JournalEntry for Entries {
             Entries::Task(item) => format!(
                 "{important} {crossed} {symbol} {content} {reset}",
                 important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { CrossedOut } else { None }
+                crossed = if item.cancelled { CrossedOut } else { None },
                 symbol = if item.completed { "X" } else { "\u{2022}" },
                 content = item.content,
                 reset = Reset

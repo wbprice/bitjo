@@ -99,7 +99,7 @@ impl Journalable for LocalDiskJournal {
         self.commit();
     }
 
-    fn cancel() {}
+    fn cancel(&mut self, index: usize) {}
 
     fn commit(&self) {
         // Update the file.
