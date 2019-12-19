@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use termion::style::{
-    CrossedOut,
-    NoCrossedOut,
-    Reset
-};
+use termion::style;
+use termion::style::Reset;
 
 #[derive(Debug, StructOpt)]
 pub enum EntryType {
@@ -82,7 +79,7 @@ impl JournalEntry for Entries {
             Entries::Event(item) => format!(
                 "{important} {crossed} {symbol} {content} {reset}",
                 important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { CrossedOut } else { None },
+                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
                 symbol = "\u{26AC}",
                 content = item.content,
                 reset = Reset
@@ -90,7 +87,7 @@ impl JournalEntry for Entries {
             Entries::Task(item) => format!(
                 "{important} {crossed} {symbol} {content} {reset}",
                 important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { CrossedOut } else { None },
+                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
                 symbol = if item.completed { "X" } else { "\u{2022}" },
                 content = item.content,
                 reset = Reset
@@ -98,7 +95,7 @@ impl JournalEntry for Entries {
             Entries::Note(item) => format!(
                 "{important} {crossed} {symbol} {content} {reset}",
                 important = if item.important { "*" } else { " " },
-                crossed = if item.cancelled { CrossedOut } else { None },
+                crossed = if item.cancelled { style::CrossedOut } else { style::NoCrossedOut },
                 symbol = "-",
                 content = item.content,
                 reset = Reset
