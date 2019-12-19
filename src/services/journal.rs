@@ -1,10 +1,10 @@
 use chrono::Local;
 use serde_yaml;
-use std::fs::{OpenOptions, File};
+use std::fs::{OpenOptions};
 use std::io::prelude::*;
 use std::path::Path;
 
-use crate::models::{Entries, Note, Event};
+use crate::models::{Entries};
 
 pub trait Journalable {
     fn new() -> Self;
@@ -31,16 +31,17 @@ impl Journalable for InMemoryJournal {
 }
 
 pub struct LocalDiskJournal {
-    file: std::fs::File,
+    path: String,
     entries: Vec<Entries>,
 }
 
 impl Journalable for LocalDiskJournal {
     fn new() -> LocalDiskJournal {
         let path = Local::now().format("%a-%b-%e.yaml").to_string();
+        // Get a handle to the file
         let mut file = match OpenOptions::new()
-            .write(true)
             .read(true)
+            .write(true)
             .create(true)
             .open(&path)
         {
@@ -54,23 +55,36 @@ impl Journalable for LocalDiskJournal {
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
-        return match &contents.is_empty() {
+        // If the file has contents, set the contents as the initial state of entries
+        match &contents.is_empty() {
             true => LocalDiskJournal {
-                file,
+                path,
                 entries: vec![],
             },
             false => {
                 let entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
-                LocalDiskJournal { file, entries }
+                LocalDiskJournal { path, entries }
             }
-        };
+        }
     }
 
     fn append(&mut self, entry: Entries) {
         self.entries.push(entry);
         // Update the file.
         let yaml = format!("{}\n", serde_yaml::to_string(&self.entries).unwrap());
-        self.file.write_all(&yaml.as_bytes()).unwrap();
+
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&self.path)
+        {
+            Ok(file) => file,
+            Err(error) => {
+                panic!(error);
+            }
+        };
+        
+        file.write_all(&yaml.as_bytes()).unwrap();
     }
 
     fn list(&self) -> &Vec<Entries> {
@@ -81,6 +95,8 @@ impl Journalable for LocalDiskJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use crate::models::{Event, Note};
 
     #[test]
     fn in_memory_journal_created() {
@@ -103,8 +119,7 @@ mod tests {
     fn on_disk_journal_created() {
         let journal = LocalDiskJournal::new();
         let entries = journal.list();
-        let path = Local::now().format("%a-%b-%e.txt").to_string();
-        let file = File::open(&path);
+        let file = File::open(&journal.path);
         assert_eq!(entries.len(), 0);
         assert!(file.is_ok());
     }
@@ -116,6 +131,11 @@ mod tests {
             "Learn how to write unit tests".to_string(),
         )));
         let entries = journal.list();
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
         assert_eq!(entries.len(), 1);
+        assert_eq!(disk_entries.len(), 1);
     }
 }
