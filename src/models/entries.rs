@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, StructOpt)]
 pub enum EntryType {
