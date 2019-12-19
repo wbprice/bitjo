@@ -38,8 +38,8 @@ fn main() {
             Command::Complete => {
                 unimplemented!();
             }
-            Command::Remove => {
-                unimplemented!();
+            Command::Remove { index } => {
+                journal.remove(index)
             }
         }
     }

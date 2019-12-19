@@ -9,6 +9,8 @@ pub trait Journalable {
     fn new(path: Option<String>) -> Self;
     fn append(&mut self, entry: Entries);
     fn list(&self) -> &Vec<Entries>;
+    fn remove(&mut self, index: usize);
+    fn commit(&self);
 }
 
 pub struct InMemoryJournal {
@@ -27,6 +29,12 @@ impl Journalable for InMemoryJournal {
     fn list(&self) -> &Vec<Entries> {
         &self.entries
     }
+
+    fn remove(&mut self, index: usize) {
+        self.entries.remove(index);
+    }
+
+    fn commit(&self) {}
 }
 
 pub struct LocalDiskJournal {
@@ -74,6 +82,19 @@ impl Journalable for LocalDiskJournal {
 
     fn append(&mut self, entry: Entries) {
         self.entries.push(entry);
+        self.commit();
+    }
+
+    fn list(&self) -> &Vec<Entries> {
+        &self.entries
+    }
+
+    fn remove(&mut self, index: usize) {
+        self.entries.remove(index);
+        self.commit();
+    }
+
+    fn commit(&self) {
         // Update the file.
         let yaml = format!("{}\n", serde_yaml::to_string(&self.entries).unwrap());
 
@@ -90,10 +111,6 @@ impl Journalable for LocalDiskJournal {
         };
 
         file.write_all(&yaml.as_bytes()).unwrap();
-    }
-
-    fn list(&self) -> &Vec<Entries> {
-        &self.entries
     }
 }
 
