@@ -11,6 +11,7 @@ pub trait Journalable {
     fn list(&self) -> &Vec<Entries>;
     fn remove(&mut self, index: usize);
     fn commit(&self);
+    fn cancel(&mut self, index: usize);
 }
 
 pub struct InMemoryJournal {
@@ -32,6 +33,10 @@ impl Journalable for InMemoryJournal {
 
     fn remove(&mut self, index: usize) {
         self.entries.remove(index);
+    }
+
+    fn cancel(&mut self, index: usize) {
+
     }
 
     fn commit(&self) {}
@@ -93,6 +98,8 @@ impl Journalable for LocalDiskJournal {
         self.entries.remove(index);
         self.commit();
     }
+
+    fn cancel() {}
 
     fn commit(&self) {
         // Update the file.
