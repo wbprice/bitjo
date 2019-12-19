@@ -6,7 +6,7 @@ use std::io::prelude::*;
 use crate::models::Entries;
 
 pub trait Journalable {
-    fn new(prefix: Option<String>) -> Self;
+    fn new(path: Option<String>) -> Self;
     fn append(&mut self, entry: Entries);
     fn list(&self) -> &Vec<Entries>;
 }
@@ -16,7 +16,7 @@ pub struct InMemoryJournal {
 }
 
 impl Journalable for InMemoryJournal {
-    fn new(_prefix: Option<String>) -> InMemoryJournal {
+    fn new(_path: Option<String>) -> InMemoryJournal {
         InMemoryJournal { entries: vec![] }
     }
 
@@ -35,11 +35,11 @@ pub struct LocalDiskJournal {
 }
 
 impl Journalable for LocalDiskJournal {
-    fn new(prefix: Option<String>) -> LocalDiskJournal {
-        let datestamp = Local::now().format("%Y-%m-%d.yaml").to_string();
-        let path = match prefix {
-            Some(prefix) => format!("{}-{}", prefix, datestamp),
-            None => datestamp,
+    fn new(path: Option<String>) -> LocalDiskJournal {
+        // If no path is provided, use the current date.
+        let path = match path {
+            Some(path) => path,
+            None => Local::now().format("%Y-%m-%d.yaml").to_string()
         };
 
         // Get a handle to the file
