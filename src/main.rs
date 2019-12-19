@@ -7,7 +7,7 @@ mod controllers;
 
 use crate::{
     services::{
-        InMemoryJournal,
+        LocalDiskJournal,
         Journalable
     },
     models::{
@@ -28,26 +28,7 @@ fn main() {
     let opt = Opt::from_args();
 
     // Stubbing out behavior where this is serialized and persisted to a backend
-    let mut journal = InMemoryJournal::new();
-
-    journal.append(
-        Entries::Event(Event {
-            content: "Internal Standup at 4pm".into(),
-            ..Default::default()
-        })
-    );
-    journal.append(
-        Entries::Task(Task {
-            content: "Figure out enums".into(),
-            ..Default::default()
-        })
-    );
-    journal.append(
-        Entries::Note(Note {
-            content: "I'm just surprised this worked".into(),
-            ..Default::default()
-        })
-    );
+    let mut journal = LocalDiskJournal::new();
 
     // Handle input!
     if let Some(command) = opt.command {

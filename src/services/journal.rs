@@ -4,7 +4,7 @@ use std::fs::{OpenOptions, File};
 use std::io::prelude::*;
 use std::path::Path;
 
-use crate::models::{Entries, Note};
+use crate::models::{Entries, Note, Event};
 
 pub trait Journalable {
     fn new() -> Self;
@@ -46,7 +46,6 @@ impl Journalable for LocalDiskJournal {
         {
             Ok(file) => file,
             Err(error) => {
-                dbg!(&error);
                 panic!(error);
             }
         };
@@ -71,8 +70,6 @@ impl Journalable for LocalDiskJournal {
         self.entries.push(entry);
         // Update the file.
         let yaml = serde_yaml::to_string(&self.entries).unwrap();
-        dbg!(&yaml);
-        dbg!(&yaml.as_bytes());
         self.file.write_all(&yaml.as_bytes()).unwrap();
     }
 
