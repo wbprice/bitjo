@@ -2,7 +2,6 @@ use chrono::Local;
 use serde_yaml;
 use std::fs::{OpenOptions};
 use std::io::prelude::*;
-use std::path::Path;
 
 use crate::models::{Entries};
 
@@ -75,6 +74,7 @@ impl Journalable for LocalDiskJournal {
 
         let mut file = match OpenOptions::new()
             .write(true)
+            .create(true)
             .truncate(true)
             .open(&self.path)
         {
