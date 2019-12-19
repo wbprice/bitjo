@@ -18,5 +18,7 @@ pub enum Command {
     },
     Complete,
     Cancel,
-    Remove,
+    Remove {
+        index: usize
+    },
 }
