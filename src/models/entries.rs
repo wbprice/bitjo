@@ -79,7 +79,7 @@ impl JournalEntry for Entries {
             Entries::Event(item) => {
                 if item.cancelled {
                     return format!(
-                        "{important}{crossed} {symbol} {content} {reset}",
+                        "{important} {crossed}{symbol} {content} {reset}",
                         important = if item.important { "*" } else { " " },
                         crossed = style::CrossedOut,
                         symbol = "\u{26AC}",
@@ -99,7 +99,7 @@ impl JournalEntry for Entries {
             Entries::Task(item) => {
                 if item.cancelled {
                     return format!(
-                        "{important}{crossed} {symbol} {content} {reset}",
+                        "{important} {crossed} {symbol} {content} {reset}",
                         important = if item.important { "*" } else { " " },
                         crossed = style::CrossedOut,
                         symbol = if item.completed { "X" } else { "\u{2022}" },
@@ -118,7 +118,7 @@ impl JournalEntry for Entries {
             Entries::Note(item) => { 
                 if item.cancelled {
                     return format!(
-                        "{important}{crossed} {symbol} {content} {reset}",
+                        "{important} {crossed} {symbol} {content} {reset}",
                         important = if item.important { "*" } else { " " },
                         crossed = style::CrossedOut,
                         symbol = "-",
