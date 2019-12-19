@@ -1,13 +1,10 @@
 use chrono::Local;
-use std::fs::File;
+use serde_yaml;
+use std::fs::{OpenOptions, File};
 use std::io::prelude::*;
 use std::path::Path;
-use serde_yaml;
 
-use crate::models::{
-    Entries,
-    Note
-};
+use crate::models::{Entries, Note};
 
 pub trait Journalable {
     fn new() -> Self;
@@ -16,14 +13,12 @@ pub trait Journalable {
 }
 
 pub struct InMemoryJournal {
-    entries: Vec<Entries>
+    entries: Vec<Entries>,
 }
 
 impl Journalable for InMemoryJournal {
     fn new() -> InMemoryJournal {
-       InMemoryJournal {
-           entries: vec![]
-       } 
+        InMemoryJournal { entries: vec![] }
     }
 
     fn append(&mut self, entry: Entries) {
@@ -37,22 +32,22 @@ impl Journalable for InMemoryJournal {
 
 pub struct LocalDiskJournal {
     file: std::fs::File,
-    entries: Vec<Entries>
+    entries: Vec<Entries>,
 }
 
 impl Journalable for LocalDiskJournal {
     fn new() -> LocalDiskJournal {
-
-        let path = Local::now().format("%a-%b-%e.txt").to_string();
-        let mut file = match File::open(&path) {
+        let path = Local::now().format("%a-%b-%e.yaml").to_string();
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create(true)
+            .open(&path)
+        {
             Ok(file) => file,
             Err(error) => {
-                match File::create(&path) {
-                    Ok(file) => file,
-                    Err(error) => {
-                        panic!("The backing file doesn't exist and can't be created");
-                    }
-                }
+                dbg!(&error);
+                panic!(error);
             }
         };
 
@@ -60,20 +55,25 @@ impl Journalable for LocalDiskJournal {
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
-        let entries : Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
-
-        // base case, create a new file and return the vec
-        LocalDiskJournal {
-            file,
-            entries
-        }
+        return match &contents.is_empty() {
+            true => LocalDiskJournal {
+                file,
+                entries: vec![],
+            },
+            false => {
+                let entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+                LocalDiskJournal { file, entries }
+            }
+        };
     }
 
     fn append(&mut self, entry: Entries) {
         self.entries.push(entry);
         // Update the file.
-
-        self.file.write_all(serde_yaml::to_string(&self.entries).unwrap().as_bytes()).unwrap();
+        let yaml = serde_yaml::to_string(&self.entries).unwrap();
+        dbg!(&yaml);
+        dbg!(&yaml.as_bytes());
+        self.file.write_all(&yaml.as_bytes()).unwrap();
     }
 
     fn list(&self) -> &Vec<Entries> {
@@ -95,10 +95,11 @@ mod tests {
     #[test]
     fn in_memory_journal_appends() {
         let mut journal = InMemoryJournal::new();
-        journal.append(Entries::Note(Note::new("Learn how to write unit tests".to_string())));
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
         let entries = journal.list();
         assert_eq!(entries.len(), 1);
-        dbg!(entries);
     }
 
     #[test]
@@ -113,8 +114,10 @@ mod tests {
 
     #[test]
     fn on_dish_journal_appends() {
-        let mut journal = InMemoryJournal::new();
-        journal.append(Entries::Note(Note::new("Learn how to write unit tests".to_string())));
+        let mut journal = LocalDiskJournal::new();
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
         let entries = journal.list();
         assert_eq!(entries.len(), 1);
     }
