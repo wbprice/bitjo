@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn on_dish_journal_appends() {
+    fn on_disk_journal_appends() {
         let mut journal = LocalDiskJournal::new(Some("test2".to_string()));
         journal.append(Entries::Note(Note::new(
             "Learn how to write unit tests".to_string(),
