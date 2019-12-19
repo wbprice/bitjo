@@ -99,7 +99,7 @@ mod tests {
         File,
         remove_file
     };
-    use crate::models::{Event, Note};
+    use crate::models::{Note};
 
     #[test]
     fn in_memory_journal_created() {
