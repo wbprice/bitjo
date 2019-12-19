@@ -20,7 +20,6 @@ use crate::{
     controllers::{Opt, Command},
     views::{
         Application,
-        Modes
     }
 };
 
@@ -57,7 +56,6 @@ fn main() {
     }
 
     let application = Application {
-        mode: Modes::Normal,
         entries: journal.list(),
     };
 
