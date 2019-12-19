@@ -1,5 +1,3 @@
 mod entries;
 
-pub use self::{
-    entries::*
-};
+pub use self::entries::*;

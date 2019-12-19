@@ -1,5 +1,3 @@
 mod application;
 
-pub use self::{
-    application::*
-};
+pub use self::application::*;

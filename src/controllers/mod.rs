@@ -1,5 +1,3 @@
 mod opts;
 
-pub use self::{
-    opts::*
-};
+pub use self::opts::*;

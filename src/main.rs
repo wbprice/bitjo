@@ -1,33 +1,22 @@
 use structopt::StructOpt;
 
-mod services;
-mod models;
-mod views;
 mod controllers;
+mod models;
+mod services;
+mod views;
 
 use crate::{
-    services::{
-        LocalDiskJournal,
-        Journalable
-    },
-    models::{
-        Task,
-        Event,
-        Note,
-        EntryType,
-        Entries
-    },
-    controllers::{Opt, Command},
-    views::{
-        Application,
-    }
+    controllers::{Command, Opt},
+    models::{Entries, EntryType, Event, Note, Task},
+    services::{Journalable, LocalDiskJournal},
+    views::Application,
 };
 
 fn main() {
     let opt = Opt::from_args();
 
     // Stubbing out behavior where this is serialized and persisted to a backend
-    let mut journal = LocalDiskJournal::new();
+    let mut journal = LocalDiskJournal::new(None);
 
     // Handle input!
     if let Some(command) = opt.command {

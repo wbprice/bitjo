@@ -1,8 +1,6 @@
 use structopt::StructOpt;
 
-use crate::models::{
-    EntryType
-};
+use crate::models::EntryType;
 
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
