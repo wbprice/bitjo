@@ -2,6 +2,7 @@ use chrono::Local;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use serde_yaml;
 
 use crate::models::{
     Entries,
@@ -56,17 +57,23 @@ impl Journalable for LocalDiskJournal {
         };
 
         // Read the file.  Does it have any entries?
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+
+        let entries : Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
 
         // base case, create a new file and return the vec
         LocalDiskJournal {
             file,
-            entries: vec![]
+            entries
         }
     }
 
     fn append(&mut self, entry: Entries) {
         self.entries.push(entry);
         // Update the file.
+
+        self.file.write_all(serde_yaml::to_string(&self.entries).unwrap().as_bytes()).unwrap();
     }
 
     fn list(&self) -> &Vec<Entries> {
