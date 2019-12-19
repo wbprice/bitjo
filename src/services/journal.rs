@@ -1,3 +1,8 @@
+use chrono::Local;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 use crate::models::{
     Entries,
     Note
@@ -29,6 +34,46 @@ impl Journalable for InMemoryJournal {
     }
 }
 
+pub struct LocalDiskJournal {
+    file: std::fs::File,
+    entries: Vec<Entries>
+}
+
+impl Journalable for LocalDiskJournal {
+    fn new() -> LocalDiskJournal {
+
+        let path = Local::now().format("%a-%b-%e.txt").to_string();
+        let mut file = match File::open(&path) {
+            Ok(file) => file,
+            Err(error) => {
+                match File::create(&path) {
+                    Ok(file) => file,
+                    Err(error) => {
+                        panic!("The backing file doesn't exist and can't be created");
+                    }
+                }
+            }
+        };
+
+        // Read the file.  Does it have any entries?
+
+        // base case, create a new file and return the vec
+        LocalDiskJournal {
+            file,
+            entries: vec![]
+        }
+    }
+
+    fn append(&mut self, entry: Entries) {
+        self.entries.push(entry);
+        // Update the file.
+    }
+
+    fn list(&self) -> &Vec<Entries> {
+        &self.entries
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,5 +92,23 @@ mod tests {
         let entries = journal.list();
         assert_eq!(entries.len(), 1);
         dbg!(entries);
+    }
+
+    #[test]
+    fn on_disk_journal_created() {
+        let journal = LocalDiskJournal::new();
+        let entries = journal.list();
+        let path = Local::now().format("%a-%b-%e.txt").to_string();
+        let file = File::open(&path);
+        assert_eq!(entries.len(), 0);
+        assert!(file.is_ok());
+    }
+
+    #[test]
+    fn on_dish_journal_appends() {
+        let mut journal = InMemoryJournal::new();
+        journal.append(Entries::Note(Note::new("Learn how to write unit tests".to_string())));
+        let entries = journal.list();
+        assert_eq!(entries.len(), 1);
     }
 }
