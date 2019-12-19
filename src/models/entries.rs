@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, StructOpt)]
 pub enum EntryType {
@@ -7,7 +8,7 @@ pub enum EntryType {
     Event { text: String },
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub important: bool,
     pub content: String,
@@ -22,7 +23,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub important: bool,
     pub completed: bool,
@@ -39,7 +40,7 @@ impl Task {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Note {
     pub important: bool,
     pub content: String,
@@ -54,7 +55,7 @@ impl Note {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Entries {
     Event(Event),
     Task(Task),
