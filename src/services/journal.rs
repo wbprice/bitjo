@@ -280,4 +280,46 @@ mod tests {
 
         remove_file(&journal.path).unwrap();
     }
+
+    #[test]
+    fn on_disk_journal_toggles_importance() {
+        let mut journal = LocalDiskJournal::new(Some("importance-test".to_string()));
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_importance(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Note(note) = &journal.list()[0] {
+            assert_eq!(note.important, true);
+        }
+
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+        if let Entries::Note(note) = &disk_entries[0] {
+            assert_eq!(note.important, true);
+        }
+    }
+
+    #[test]
+    fn on_disk_journal_toggles_completion() {
+        let mut journal = LocalDiskJournal::new(Some("completion-test".to_string()));
+        journal.append(Entries::Task(Task::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_completion(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Task(task) = &journal.list()[0] {
+            assert_eq!(task.completed, true);
+        }
+
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+        if let Entries::Task(task) = &disk_entries[0] {
+            assert_eq!(task.completed, true);
+        }
+    }
 }
