@@ -1,6 +1,14 @@
 # BitJo CLI
 CLI implementation of a Bullet Journal, written in Rust.
 
+## Installation
+
+```
+cargo install bitjo
+bitjo --version
+=> bitjo 0.1.1
+```
+
 ## Usage
 
 ```
