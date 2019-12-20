@@ -39,24 +39,26 @@ impl Journalable for InMemoryJournal {
     fn commit(&self) {}
 
     fn toggle_importance(&mut self, index: usize) {
-        let mut entry = self.entries.get_mut(index).unwrap();
-        entry.important = !entry.important;
-
-        match entry {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Note(note) => {
+                note.important = !note.important;
+            },
             Entries::Event(event) => {
-
+                event.important = !event.important;
             },
             Entries::Task(task) => {
-
-            },
-            Entries::Note(note) => {
-
+                task.important = !task.important;
             }
         }
     }
 
     fn toggle_completion(&mut self, index: usize) {
-
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Task(task) => {
+                task.completed = !task.completed;
+            },
+            _ => {}
+        }
     }
 }
 
@@ -136,19 +138,36 @@ impl Journalable for LocalDiskJournal {
         file.write_all(&yaml.as_bytes()).unwrap();
     }
 
-    fn toggle_importance(&self, index: usize) {
-
+    fn toggle_importance(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Note(note) => {
+                note.important = !note.important;
+            },
+            Entries::Event(event) => {
+                event.important = !event.important;
+            },
+            Entries::Task(task) => {
+                task.important = !task.important;
+            }
+        }
+        self.commit();
     }
 
-    fn toggle_completion(&self, index: usize) {
-
+    fn toggle_completion(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Task(task) => {
+                task.completed = !task.completed;
+            },
+            _ => {}
+        }
+        self.commit();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Note;
+    use crate::models::{Note, Task};
     use std::fs::{remove_file, File};
 
     #[test]
@@ -177,6 +196,32 @@ mod tests {
         assert_eq!(journal.list().len(), 1);
         journal.remove(0);
         assert_eq!(journal.list().len(), 0);
+    }
+
+    #[test]
+    fn in_memory_journal_toggles_importance() {
+        let mut journal = InMemoryJournal::new(None);
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_importance(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Note(note) = &journal.list()[0] {
+            assert_eq!(note.important, true);
+        }
+    }
+
+    #[test]
+    fn in_memory_journal_toggles_completion() {
+        let mut journal = InMemoryJournal::new(None);
+        journal.append(Entries::Task(Task::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_completion(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Task(task) = &journal.list()[0] {
+            assert_eq!(task.completed, true);
+        }
     }
 
     #[test]
