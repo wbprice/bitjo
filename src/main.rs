@@ -33,13 +33,11 @@ fn main() {
             },
             Command::Emph { index } => {
                 journal.toggle_importance(index);
-            },
-            Command::Complete => {
-                unimplemented!();
             }
-            Command::Remove { index } => {
-                journal.remove(index)
+            Command::Complete { index } => {
+                journal.toggle_completion(index);
             }
+            Command::Remove { index } => journal.remove(index),
         }
     }
 

@@ -42,10 +42,10 @@ impl Journalable for InMemoryJournal {
         match self.entries.get_mut(index).unwrap() {
             Entries::Note(note) => {
                 note.important = !note.important;
-            },
+            }
             Entries::Event(event) => {
                 event.important = !event.important;
-            },
+            }
             Entries::Task(task) => {
                 task.important = !task.important;
             }
@@ -56,7 +56,7 @@ impl Journalable for InMemoryJournal {
         match self.entries.get_mut(index).unwrap() {
             Entries::Task(task) => {
                 task.completed = !task.completed;
-            },
+            }
             _ => {}
         }
     }
@@ -72,7 +72,7 @@ impl Journalable for LocalDiskJournal {
         // If no path is provided, use the current date.
         let path = match path {
             Some(path) => path,
-            None => Local::now().format("%Y-%m-%d.yaml").to_string()
+            None => Local::now().format("%Y-%m-%d.yaml").to_string(),
         };
 
         // Get a handle to the file
@@ -142,10 +142,10 @@ impl Journalable for LocalDiskJournal {
         match self.entries.get_mut(index).unwrap() {
             Entries::Note(note) => {
                 note.important = !note.important;
-            },
+            }
             Entries::Event(event) => {
                 event.important = !event.important;
-            },
+            }
             Entries::Task(task) => {
                 task.important = !task.important;
             }
@@ -157,7 +157,7 @@ impl Journalable for LocalDiskJournal {
         match self.entries.get_mut(index).unwrap() {
             Entries::Task(task) => {
                 task.completed = !task.completed;
-            },
+            }
             _ => {}
         }
         self.commit();
@@ -275,7 +275,7 @@ mod tests {
         file2.read_to_string(&mut contents2).unwrap();
 
         assert_eq!(journal.list().len(), 1);
-        let disk_entries2 : Vec<Entries> = serde_yaml::from_str(&contents2).unwrap();
+        let disk_entries2: Vec<Entries> = serde_yaml::from_str(&contents2).unwrap();
         assert_eq!(disk_entries2.len(), 1);
 
         remove_file(&journal.path).unwrap();

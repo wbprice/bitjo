@@ -17,10 +17,12 @@ pub enum Command {
         entry_type: EntryType,
     },
     Emph {
-        index: usize
+        index: usize,
     },
-    Complete,
+    Complete {
+        index: usize,
+    },
     Remove {
-        index: usize
+        index: usize,
     },
 }
