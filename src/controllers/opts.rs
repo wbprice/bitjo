@@ -17,7 +17,6 @@ pub enum Command {
         entry_type: EntryType,
     },
     Complete,
-    Cancel,
     Remove {
         index: usize
     },
