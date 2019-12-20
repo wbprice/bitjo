@@ -1,13 +1,13 @@
-# Bit Journal CLI
+# BitJo CLI
 CLI implementation of a Bullet Journal, written in Rust.
 
 ## Usage
 
 ```
-bit-journal-cli 0.1.0
+bitjo 0.1.1
 
 USAGE:
-    bit-journal-cli [SUBCOMMAND]
+    bitjo [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
@@ -26,7 +26,7 @@ SUBCOMMANDS:
 #### List entries
 
 ```
-cargo run
+bitjo
 ```
 
 Lists current journal items
@@ -43,7 +43,7 @@ Today is Wed, May  1.
 #### Add an entry
 
 ```
-cargo run add note "Eating a bagel"
+bitjo add note "Eating a bagel"
 ```
 
 Adds a new note to the journal, then prints the journal
@@ -61,7 +61,7 @@ Today is Tue, Nov 19.
 #### Remove an entry
 
 ```
-cargo run remove note 0
+bitjo remove note 0
 ```
 
 Removes the 0th note from the journal
