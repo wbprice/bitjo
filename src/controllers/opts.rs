@@ -16,6 +16,9 @@ pub enum Command {
         #[structopt(subcommand)]
         entry_type: EntryType,
     },
+    Emph {
+        index: usize
+    },
     Complete,
     Remove {
         index: usize

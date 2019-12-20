@@ -10,6 +10,8 @@ pub trait Journalable {
     fn append(&mut self, entry: Entries);
     fn list(&self) -> &Vec<Entries>;
     fn remove(&mut self, index: usize);
+    fn toggle_importance(&mut self, index: usize);
+    fn toggle_completion(&mut self, index: usize);
     fn commit(&self);
 }
 
@@ -35,6 +37,27 @@ impl Journalable for InMemoryJournal {
     }
 
     fn commit(&self) {}
+
+    fn toggle_importance(&mut self, index: usize) {
+        let mut entry = self.entries.get_mut(index).unwrap();
+        entry.important = !entry.important;
+
+        match entry {
+            Entries::Event(event) => {
+
+            },
+            Entries::Task(task) => {
+
+            },
+            Entries::Note(note) => {
+
+            }
+        }
+    }
+
+    fn toggle_completion(&mut self, index: usize) {
+
+    }
 }
 
 pub struct LocalDiskJournal {
@@ -111,6 +134,14 @@ impl Journalable for LocalDiskJournal {
         };
 
         file.write_all(&yaml.as_bytes()).unwrap();
+    }
+
+    fn toggle_importance(&self, index: usize) {
+
+    }
+
+    fn toggle_completion(&self, index: usize) {
+
     }
 }
 

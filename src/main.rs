@@ -32,6 +32,9 @@ fn main() {
                     journal.append(Entries::Task(Task::new(text)));
                 }
             },
+            Command::Emph => {
+                journal.emphasize(index)
+            },
             Command::Complete => {
                 unimplemented!();
             }
