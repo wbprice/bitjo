@@ -10,6 +10,8 @@ pub trait Journalable {
     fn append(&mut self, entry: Entries);
     fn list(&self) -> &Vec<Entries>;
     fn remove(&mut self, index: usize);
+    fn toggle_importance(&mut self, index: usize);
+    fn toggle_completion(&mut self, index: usize);
     fn commit(&self);
 }
 
@@ -35,6 +37,29 @@ impl Journalable for InMemoryJournal {
     }
 
     fn commit(&self) {}
+
+    fn toggle_importance(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Note(note) => {
+                note.important = !note.important;
+            }
+            Entries::Event(event) => {
+                event.important = !event.important;
+            }
+            Entries::Task(task) => {
+                task.important = !task.important;
+            }
+        }
+    }
+
+    fn toggle_completion(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Task(task) => {
+                task.completed = !task.completed;
+            }
+            _ => {}
+        }
+    }
 }
 
 pub struct LocalDiskJournal {
@@ -47,7 +72,7 @@ impl Journalable for LocalDiskJournal {
         // If no path is provided, use the current date.
         let path = match path {
             Some(path) => path,
-            None => Local::now().format("%Y-%m-%d.yaml").to_string()
+            None => Local::now().format("%Y-%m-%d.yaml").to_string(),
         };
 
         // Get a handle to the file
@@ -112,12 +137,37 @@ impl Journalable for LocalDiskJournal {
 
         file.write_all(&yaml.as_bytes()).unwrap();
     }
+
+    fn toggle_importance(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Note(note) => {
+                note.important = !note.important;
+            }
+            Entries::Event(event) => {
+                event.important = !event.important;
+            }
+            Entries::Task(task) => {
+                task.important = !task.important;
+            }
+        }
+        self.commit();
+    }
+
+    fn toggle_completion(&mut self, index: usize) {
+        match self.entries.get_mut(index).unwrap() {
+            Entries::Task(task) => {
+                task.completed = !task.completed;
+            }
+            _ => {}
+        }
+        self.commit();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Note;
+    use crate::models::{Note, Task};
     use std::fs::{remove_file, File};
 
     #[test]
@@ -146,6 +196,32 @@ mod tests {
         assert_eq!(journal.list().len(), 1);
         journal.remove(0);
         assert_eq!(journal.list().len(), 0);
+    }
+
+    #[test]
+    fn in_memory_journal_toggles_importance() {
+        let mut journal = InMemoryJournal::new(None);
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_importance(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Note(note) = &journal.list()[0] {
+            assert_eq!(note.important, true);
+        }
+    }
+
+    #[test]
+    fn in_memory_journal_toggles_completion() {
+        let mut journal = InMemoryJournal::new(None);
+        journal.append(Entries::Task(Task::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_completion(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Task(task) = &journal.list()[0] {
+            assert_eq!(task.completed, true);
+        }
     }
 
     #[test]
@@ -199,9 +275,53 @@ mod tests {
         file2.read_to_string(&mut contents2).unwrap();
 
         assert_eq!(journal.list().len(), 1);
-        let disk_entries2 : Vec<Entries> = serde_yaml::from_str(&contents2).unwrap();
+        let disk_entries2: Vec<Entries> = serde_yaml::from_str(&contents2).unwrap();
         assert_eq!(disk_entries2.len(), 1);
 
+        remove_file(&journal.path).unwrap();
+    }
+
+    #[test]
+    fn on_disk_journal_toggles_importance() {
+        let mut journal = LocalDiskJournal::new(Some("importance-test".to_string()));
+        journal.append(Entries::Note(Note::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_importance(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Note(note) = &journal.list()[0] {
+            assert_eq!(note.important, true);
+        }
+
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+        if let Entries::Note(note) = &disk_entries[0] {
+            assert_eq!(note.important, true);
+        }
+        remove_file(&journal.path).unwrap();
+    }
+
+    #[test]
+    fn on_disk_journal_toggles_completion() {
+        let mut journal = LocalDiskJournal::new(Some("completion-test".to_string()));
+        journal.append(Entries::Task(Task::new(
+            "Learn how to write unit tests".to_string(),
+        )));
+        journal.toggle_completion(0);
+        assert_eq!(journal.list().len(), 1);
+        if let Entries::Task(task) = &journal.list()[0] {
+            assert_eq!(task.completed, true);
+        }
+
+        let mut file = File::open(&journal.path).unwrap();
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let disk_entries: Vec<Entries> = serde_yaml::from_str(&contents).unwrap();
+        if let Entries::Task(task) = &disk_entries[0] {
+            assert_eq!(task.completed, true);
+        }
         remove_file(&journal.path).unwrap();
     }
 }

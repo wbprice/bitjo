@@ -15,7 +15,6 @@ use crate::{
 fn main() {
     let opt = Opt::from_args();
 
-    // Stubbing out behavior where this is serialized and persisted to a backend
     let mut journal = LocalDiskJournal::new(None);
 
     // Handle input!
@@ -32,12 +31,13 @@ fn main() {
                     journal.append(Entries::Task(Task::new(text)));
                 }
             },
-            Command::Complete => {
-                unimplemented!();
+            Command::Emph { index } => {
+                journal.toggle_importance(index);
             }
-            Command::Remove { index } => {
-                journal.remove(index)
+            Command::Complete { index } => {
+                journal.toggle_completion(index);
             }
+            Command::Remove { index } => journal.remove(index),
         }
     }
 
