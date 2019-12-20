@@ -1,12 +1,4 @@
 use serde::{Deserialize, Serialize};
-use structopt::StructOpt;
-
-#[derive(Debug, StructOpt)]
-pub enum EntryType {
-    Task { text: String },
-    Note { text: String },
-    Event { text: String },
-}
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Event {
@@ -64,8 +56,6 @@ pub enum Entries {
 
 pub trait JournalEntry {
     fn render(&self) -> String;
-    fn toggle_completed(&self) -> Entries;
-    fn set_content(&self, content: String) -> Entries;
 }
 
 impl JournalEntry for Entries {
@@ -89,34 +79,6 @@ impl JournalEntry for Entries {
                 symbol = "-",
                 content = item.content
             ),
-        }
-    }
-
-    fn toggle_completed(&self) -> Entries {
-        match self {
-            Entries::Task(item) => Entries::Task(Task {
-                completed: !item.completed,
-                ..item.clone()
-            }),
-            Entries::Note(note) => Entries::Note(Note { ..note.clone() }),
-            Entries::Event(event) => Entries::Event(Event { ..event.clone() }),
-        }
-    }
-
-    fn set_content(&self, content: String) -> Entries {
-        match self {
-            Entries::Task(item) => Entries::Task(Task {
-                content,
-                ..item.clone()
-            }),
-            Entries::Note(note) => Entries::Note(Note {
-                content,
-                ..note.clone()
-            }),
-            Entries::Event(event) => Entries::Event(Event {
-                content,
-                ..event.clone()
-            }),
         }
     }
 }
