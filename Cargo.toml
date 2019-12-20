@@ -6,10 +6,10 @@ edition = "2018"
 description = "A Rust note-taking CLI app, inspired by bullet journaling."
 license = "MIT"
 
-
 [dependencies]
 termion = "1.5.3"
 chrono = "0.4"
 structopt = "0.3.4"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_yaml = "0.8"
+dirs = "2.0.2"

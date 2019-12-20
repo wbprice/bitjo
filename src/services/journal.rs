@@ -2,6 +2,8 @@ use chrono::Local;
 use serde_yaml;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use dirs::home_dir;
+use std::fs;
 
 use crate::models::Entries;
 
@@ -66,10 +68,16 @@ pub struct LocalDiskJournal {
 
 impl Journalable for LocalDiskJournal {
     fn new(path: Option<String>) -> LocalDiskJournal {
-        // If no path is provided, use the current date.
+        let prefix = home_dir().unwrap().join(".bitjo");
+        fs::create_dir_all(prefix.to_str().unwrap()).unwrap();
+
         let path = match path {
-            Some(path) => path,
-            None => Local::now().format("%Y-%m-%d.yaml").to_string(),
+            Some(path) => {
+                prefix.join(path).to_str().unwrap().to_string()
+            }
+            None => {
+                prefix.join(Local::now().format("%Y-%m-%d.yaml").to_string()).to_str().unwrap().to_string()
+            }
         };
 
         // Get a handle to the file
@@ -81,6 +89,7 @@ impl Journalable for LocalDiskJournal {
         {
             Ok(file) => file,
             Err(error) => {
+                dbg!(&error);
                 panic!(error);
             }
         };
