@@ -1,6 +1,6 @@
 [package]
 name = "bitjo"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Blaine Price <1wbprice@gmail.com>"]
 edition = "2018"
 description = "A Rust note-taking CLI app, inspired by bullet journaling."

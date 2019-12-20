@@ -11,7 +11,7 @@ pub struct Application<'a> {
 impl<'a> Application<'a> {
     fn render_header_bar(&self) {
         println!(
-            "{green}Bit Journal v0.1.0{reset}\r",
+            "{green}Bit Journal v0.1.1{reset}\r",
             green = color::Fg(color::Green),
             reset = color::Fg(color::Reset)
         );
