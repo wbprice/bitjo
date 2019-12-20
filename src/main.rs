@@ -32,9 +32,6 @@ fn main() {
                     journal.append(Entries::Task(Task::new(text)));
                 }
             },
-            Command::Cancel => {
-                unimplemented!();
-            }
             Command::Complete => {
                 unimplemented!();
             }
