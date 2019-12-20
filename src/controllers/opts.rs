@@ -1,6 +1,23 @@
 use structopt::StructOpt;
 
-use crate::models::EntryType;
+#[derive(Debug, StructOpt)]
+pub enum EntryType {
+    /// Add a new task entry
+    Task {
+        /// The task description
+        text: String,
+    },
+    /// Add a new note entry
+    Note {
+        /// The note contents
+        text: String,
+    },
+    /// Add a new event entry
+    Event {
+        /// The event description
+        text: String,
+    },
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
@@ -12,17 +29,15 @@ pub struct Opt {
 #[derive(Debug, StructOpt)]
 #[structopt(rename_all = "kebab-case")]
 pub enum Command {
+    /// Adds a new entry of a given type to the journal
     Add {
         #[structopt(subcommand)]
         entry_type: EntryType,
     },
-    Emph {
-        index: usize,
-    },
-    Complete {
-        index: usize,
-    },
-    Remove {
-        index: usize,
-    },
+    /// Toggles the importance of the nth entry in the list
+    Emph { index: usize },
+    /// Toggles the completion of the nth entry in the list
+    Complete { index: usize },
+    /// Removes the nth entry in the list
+    Remove { index: usize },
 }

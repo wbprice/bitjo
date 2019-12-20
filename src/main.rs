@@ -6,8 +6,8 @@ mod services;
 mod views;
 
 use crate::{
-    controllers::{Command, Opt},
-    models::{Entries, EntryType, Event, Note, Task},
+    controllers::{Command, EntryType, Opt},
+    models::{Entries, Event, Note, Task},
     services::{Journalable, LocalDiskJournal},
     views::Application,
 };

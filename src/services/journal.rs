@@ -53,11 +53,8 @@ impl Journalable for InMemoryJournal {
     }
 
     fn toggle_completion(&mut self, index: usize) {
-        match self.entries.get_mut(index).unwrap() {
-            Entries::Task(task) => {
-                task.completed = !task.completed;
-            }
-            _ => {}
+        if let Entries::Task(task) = self.entries.get_mut(index).unwrap() {
+            task.completed = !task.completed;
         }
     }
 }
@@ -154,11 +151,8 @@ impl Journalable for LocalDiskJournal {
     }
 
     fn toggle_completion(&mut self, index: usize) {
-        match self.entries.get_mut(index).unwrap() {
-            Entries::Task(task) => {
-                task.completed = !task.completed;
-            }
-            _ => {}
+        if let Entries::Task(task) = self.entries.get_mut(index).unwrap() {
+            task.completed = !task.completed;
         }
         self.commit();
     }
