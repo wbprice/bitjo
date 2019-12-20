@@ -300,6 +300,7 @@ mod tests {
         if let Entries::Note(note) = &disk_entries[0] {
             assert_eq!(note.important, true);
         }
+        remove_file(&journal.path).unwrap();
     }
 
     #[test]
@@ -321,5 +322,6 @@ mod tests {
         if let Entries::Task(task) = &disk_entries[0] {
             assert_eq!(task.completed, true);
         }
+        remove_file(&journal.path).unwrap();
     }
 }
