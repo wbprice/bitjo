@@ -14,9 +14,9 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    add
-    cancel
-    complete
+    add         
+    complete    
+    emph        
     help        Prints this message or the help of the given subcommand(s)
     remove
 ```
@@ -52,5 +52,4 @@ Today is Tue, Nov 19.
   X Laugh uncontrollably
   - I'm just surprised this worked
   - Eating a bagel
-The current mode is Normal
 ```
