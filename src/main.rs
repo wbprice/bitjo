@@ -32,6 +32,17 @@ fn main() {
                 journal.toggle_completion(index);
             }
             Command::Remove { index } => journal.remove(index),
+            Command::Sub { index, new_entry } => match new_entry {
+                EntryOpts::Event { text } => {
+                    journal.append_subtask(index, Entry::new(EntryVariants::Event, text))
+                }
+                EntryOpts::Note { text } => {
+                    journal.append_subtask(index, Entry::new(EntryVariants::Note, text))
+                }
+                EntryOpts::Task { text } => {
+                    journal.append_subtask(index, Entry::new(EntryVariants::Task, text))
+                }
+            },
         }
     }
 

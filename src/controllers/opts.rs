@@ -40,4 +40,10 @@ pub enum Command {
     Complete { index: usize },
     /// Removes the nth entry in the list
     Remove { index: usize },
+    /// Allows for nesting of entries
+    Sub {
+        index: usize,
+        #[structopt(subcommand)]
+        new_entry: Option<Command>
+    }
 }

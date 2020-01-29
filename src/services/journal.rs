@@ -10,6 +10,7 @@ use crate::models::Entry;
 pub trait Journalable {
     fn new(path: Option<String>) -> Self;
     fn append(&mut self, entry: Entry);
+    fn append_subtask(&mut self, index: usize, entry: Entry);
     fn list(&self) -> &Vec<Entry>;
     fn remove(&mut self, index: usize);
     fn toggle_importance(&mut self, index: usize);
@@ -28,6 +29,11 @@ impl Journalable for InMemoryJournal {
 
     fn append(&mut self, entry: Entry) {
         self.entries.push(entry);
+    }
+
+    fn append_subtask(&mut self, index: usize, entry: Entry) {
+        let existing_entry = self.entries.get_mut(index).unwrap();
+        existing_entry.children.push(entry);
     }
 
     fn list(&self) -> &Vec<Entry> {
@@ -103,6 +109,12 @@ impl Journalable for LocalDiskJournal {
 
     fn append(&mut self, entry: Entry) {
         self.entries.push(entry);
+        self.commit();
+    }
+
+    fn append_subtask(&mut self, index: usize, entry: Entry) {
+        let existing_entry = self.entries.get_mut(index).unwrap();
+        existing_entry.children.push(entry);
         self.commit();
     }
 
