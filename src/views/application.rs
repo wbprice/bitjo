@@ -1,11 +1,11 @@
 use chrono::Local;
 use termion::{color, style};
 
-use crate::models::{Entries, JournalEntry};
+use crate::models::{Entry, JournalEntry};
 
 #[derive(Debug)]
 pub struct Application<'a> {
-    pub entries: &'a Vec<Entries>,
+    pub entries: &'a Vec<Entry>,
 }
 
 impl<'a> Application<'a> {

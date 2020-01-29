@@ -7,7 +7,7 @@ mod views;
 
 use crate::{
     controllers::{Command, EntryType, Opt},
-    models::{Entries, Event, Note, Task},
+    models::{Entry, Entries},
     services::{Journalable, LocalDiskJournal},
     views::Application,
 };
@@ -22,13 +22,13 @@ fn main() {
         match command {
             Command::Add { entry_type } => match entry_type {
                 EntryType::Event { text } => {
-                    journal.append(Entries::Event(Event::new(text)));
+                    journal.append(Entry::new(Entries::Event, text))
                 }
                 EntryType::Note { text } => {
-                    journal.append(Entries::Note(Note::new(text)));
+                    journal.append(Entry::new(Entries::Note, text))
                 }
                 EntryType::Task { text } => {
-                    journal.append(Entries::Task(Task::new(text)));
+                    journal.append(Entry::new(Entries::Task, text))
                 }
             },
             Command::Emph { index } => {
