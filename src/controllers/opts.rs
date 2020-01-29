@@ -32,7 +32,7 @@ pub enum Command {
     /// Adds a new entry of a given type to the journal
     Add {
         #[structopt(subcommand)]
-        new_entry: EntryOpts
+        new_entry: EntryOpts,
     },
     /// Toggles the importance of the nth entry in the list
     Emph { index: usize },

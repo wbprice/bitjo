@@ -21,15 +21,9 @@ fn main() {
     if let Some(command) = opt.command {
         match command {
             Command::Add { new_entry } => match new_entry {
-                EntryOpts::Event { text } => {
-                    journal.append(Entry::new(EntryVariants::Event, text))
-                }
-                EntryOpts::Note { text } => {
-                    journal.append(Entry::new(EntryVariants::Note, text))
-                }
-                EntryOpts::Task { text } => {
-                    journal.append(Entry::new(EntryVariants::Task, text))
-                }
+                EntryOpts::Event { text } => journal.append(Entry::new(EntryVariants::Event, text)),
+                EntryOpts::Note { text } => journal.append(Entry::new(EntryVariants::Note, text)),
+                EntryOpts::Task { text } => journal.append(Entry::new(EntryVariants::Task, text)),
             },
             Command::Emph { index } => {
                 journal.toggle_importance(index);

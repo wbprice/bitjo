@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub enum EntryVariants {
     Note,
     Task,
-    Event
+    Event,
 }
 
 impl Default for EntryVariants {
@@ -20,7 +20,7 @@ pub struct Entry {
     pub completed: bool,
     pub cancelled: bool,
     pub variant: EntryVariants,
-    pub children: Vec<Entry>
+    pub children: Vec<Entry>,
 }
 
 impl Entry {

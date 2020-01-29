@@ -150,7 +150,7 @@ impl Journalable for LocalDiskJournal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{EntryVariants, Entry};
+    use crate::models::{Entry, EntryVariants};
     use std::fs::{remove_file, File};
 
     #[test]
