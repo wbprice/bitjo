@@ -1,7 +1,7 @@
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-pub enum EntryType {
+pub enum EntryOpts {
     /// Add a new task entry
     Task {
         /// The task description
@@ -32,7 +32,7 @@ pub enum Command {
     /// Adds a new entry of a given type to the journal
     Add {
         #[structopt(subcommand)]
-        entry_type: EntryType,
+        new_entry: EntryOpts,
     },
     /// Toggles the importance of the nth entry in the list
     Emph { index: usize },

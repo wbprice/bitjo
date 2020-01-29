@@ -1,83 +1,62 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Event {
-    pub important: bool,
-    pub content: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EntryVariants {
+    Note,
+    Task,
+    Event,
 }
 
-impl Event {
-    pub fn new(content: String) -> Event {
-        Event {
-            content,
-            ..Default::default()
-        }
+impl Default for EntryVariants {
+    fn default() -> Self {
+        EntryVariants::Note
     }
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Task {
+pub struct Entry {
     pub important: bool,
+    pub content: String,
     pub completed: bool,
     pub cancelled: bool,
-    pub content: String,
+    pub variant: EntryVariants,
+    pub children: Vec<Entry>,
 }
 
-impl Task {
-    pub fn new(content: String) -> Task {
-        Task {
+impl Entry {
+    pub fn new(variant: EntryVariants, content: String) -> Entry {
+        Entry {
+            variant,
             content,
             ..Default::default()
         }
     }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct Note {
-    pub important: bool,
-    pub content: String,
-}
-
-impl Note {
-    pub fn new(content: String) -> Note {
-        Note {
-            content,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Entries {
-    Event(Event),
-    Task(Task),
-    Note(Note),
 }
 
 pub trait JournalEntry {
     fn render(&self) -> String;
 }
 
-impl JournalEntry for Entries {
+impl JournalEntry for Entry {
     fn render(&self) -> String {
-        match self {
-            Entries::Event(item) => format!(
+        match self.variant {
+            EntryVariants::Event => format!(
                 "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
+                important = if self.important { "*" } else { " " },
                 symbol = "\u{26AC}",
-                content = item.content
+                content = self.content
             ),
-            Entries::Task(item) => format!(
+            EntryVariants::Task => format!(
                 "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
-                symbol = if item.completed { "X" } else { "\u{2022}" },
-                content = item.content
+                important = if self.important { "*" } else { " " },
+                symbol = if self.completed { "X" } else { "\u{2022}" },
+                content = self.content
             ),
-            Entries::Note(item) => format!(
+            EntryVariants::Note => format!(
                 "{important} {symbol} {content}",
-                important = if item.important { "*" } else { " " },
+                important = if self.important { "*" } else { " " },
                 symbol = "-",
-                content = item.content
+                content = self.content
             ),
         }
     }
