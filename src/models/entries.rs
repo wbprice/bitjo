@@ -19,7 +19,6 @@ pub struct Entry {
     pub content: String,
     pub completed: bool,
     pub cancelled: bool,
-    #[serde(default)]
     pub variant: EntryVariants,
     pub children: Vec<Entry>
 }
