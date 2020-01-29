@@ -32,33 +32,6 @@ fn main() {
                 journal.toggle_completion(index);
             }
             Command::Remove { index } => journal.remove(index),
-            Command::Sub { index, command } => {
-                if let Some(command) = command {
-                    match *command {
-                        Command::Add { new_entry } => match new_entry {
-                            EntryOpts::Event { text } => {
-                                journal.append_subtask(index, Entry::new(EntryVariants::Event, text))
-                            }
-                            EntryOpts::Note { text } => {
-                                journal.append_subtask(index, Entry::new(EntryVariants::Note, text))
-                            }
-                            EntryOpts::Task { text } => {
-                                journal.append_subtask(index, Entry::new(EntryVariants::Task, text))
-                            }
-                        },
-                        Command::Emph { index } => {
-                            journal.toggle_importance(index);
-                        }
-                        Command::Complete { index } => {
-                            journal.toggle_completion(index);
-                        }
-                        Command::Remove { index } => journal.remove(index),
-                        _ => {
-                            unimplemented!();
-                        }
-                    }
-                }
-            }
         }
     }
 
