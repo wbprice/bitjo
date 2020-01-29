@@ -6,7 +6,7 @@ mod services;
 mod views;
 
 use crate::{
-    controllers::{Command, EntryType, Opt},
+    controllers::{Command, EntryOpts, Opt},
     models::{Entry, EntryVariants},
     services::{Journalable, LocalDiskJournal},
     views::Application,
@@ -20,14 +20,14 @@ fn main() {
     // Handle input!
     if let Some(command) = opt.command {
         match command {
-            Command::Add { entry_type } => match entry_type {
-                EntryType::Event { text } => {
+            Command::Add { new_entry } => match new_entry {
+                EntryOpts::Event { text } => {
                     journal.append(Entry::new(EntryVariants::Event, text))
                 }
-                EntryType::Note { text } => {
+                EntryOpts::Note { text } => {
                     journal.append(Entry::new(EntryVariants::Note, text))
                 }
-                EntryType::Task { text } => {
+                EntryOpts::Task { text } => {
                     journal.append(Entry::new(EntryVariants::Task, text))
                 }
             },
