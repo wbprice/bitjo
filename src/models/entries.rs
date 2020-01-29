@@ -1,15 +1,15 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Entries {
+pub enum EntryVariants {
     Note,
     Task,
     Event
 }
 
-impl Default for Entries {
+impl Default for EntryVariants {
     fn default() -> Self {
-        Entries::Note
+        EntryVariants::Note
     }
 }
 
@@ -19,14 +19,14 @@ pub struct Entry {
     pub content: String,
     pub completed: bool,
     pub cancelled: bool,
-    pub kind: Entries,
+    pub variant: EntryVariants,
     pub children: Vec<Entry>
 }
 
 impl Entry {
-    pub fn new(kind: Entries, content: String) -> Entry {
+    pub fn new(variant: EntryVariants, content: String) -> Entry {
         Entry {
-            kind,
+            variant,
             content,
             ..Default::default()
         }
@@ -39,20 +39,20 @@ pub trait JournalEntry {
 
 impl JournalEntry for Entry {
     fn render(&self) -> String {
-        match self.kind {
-            Entries::Event => format!(
+        match self.variant {
+            EntryVariants::Event => format!(
                 "{important} {symbol} {content}",
                 important = if self.important { "*" } else { " " },
                 symbol = "\u{26AC}",
                 content = self.content
             ),
-            Entries::Task => format!(
+            EntryVariants::Task => format!(
                 "{important} {symbol} {content}",
                 important = if self.important { "*" } else { " " },
                 symbol = if self.completed { "X" } else { "\u{2022}" },
                 content = self.content
             ),
-            Entries::Note => format!(
+            EntryVariants::Note => format!(
                 "{important} {symbol} {content}",
                 important = if self.important { "*" } else { " " },
                 symbol = "-",
