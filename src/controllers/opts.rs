@@ -44,6 +44,6 @@ pub enum Command {
     Sub {
         index: usize,
         #[structopt(subcommand)]
-        new_entry: Option<Command>
+        command: Option<Box<Command>>
     }
 }
