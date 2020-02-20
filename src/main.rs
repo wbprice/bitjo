@@ -1,4 +1,8 @@
 use structopt::StructOpt;
+use termion::raw::IntoRawMode;
+use std::io::{Write, stdout, stdin};
+use termion::event::Key;
+use termion::input::TermRead;
 
 mod controllers;
 mod models;
@@ -40,4 +44,19 @@ fn main() {
     };
 
     application.render();
+
+    let mut stdout = stdout().into_raw_mode().unwrap();
+    let stdin = stdin();
+
+    writeln!(stdout, "Hey there.").unwrap();
+
+    for c in stdin.keys() {
+        
+        match c.unwrap() {
+            Key::Char('q') => break,
+            _ => {}
+        }
+
+        stdout.flush().unwrap();
+    }
 }
