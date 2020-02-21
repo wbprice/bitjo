@@ -40,6 +40,7 @@ fn main() {
     }
 
     let application = Application {
+        stdout: stdout().into_raw_mode().unwrap(),
         entries: journal.list(),
     };
 

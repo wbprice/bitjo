@@ -1,10 +1,12 @@
 use chrono::Local;
 use termion::{color, style};
+use std::io::{Stdout};
+use termion::raw::RawTerminal;
 
 use crate::models::{Entry, JournalEntry};
 
-#[derive(Debug)]
 pub struct Application<'a> {
+    pub stdout: RawTerminal<Stdout>,
     pub entries: &'a Vec<Entry>,
 }
 
