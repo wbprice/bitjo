@@ -1,8 +1,8 @@
+use std::io::{stdin, stdout, Write};
 use structopt::StructOpt;
-use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stdin};
 use termion::event::Key;
 use termion::input::TermRead;
+use termion::raw::IntoRawMode;
 
 mod controllers;
 mod models;
@@ -39,25 +39,21 @@ fn main() {
         }
     }
 
-    let application = Application {
+    let mut application = Application {
         stdout: stdout().into_raw_mode().unwrap(),
         entries: journal.list(),
     };
 
     application.render();
 
-    let mut stdout = stdout().into_raw_mode().unwrap();
     let stdin = stdin();
 
-    writeln!(stdout, "Hey there.").unwrap();
-
     for c in stdin.keys() {
-        
         match c.unwrap() {
             Key::Char('q') => break,
             _ => {}
         }
 
-        stdout.flush().unwrap();
+        application.stdout.flush().unwrap();
     }
 }
