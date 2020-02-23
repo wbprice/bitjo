@@ -50,8 +50,14 @@ fn main() {
     for c in stdin.keys() {
         match c.unwrap() {
             Key::Char('q') => break,
+            Key::Char('h') => application.on_cursor_left(),
+            Key::Char('j') => application.on_cursor_up(),
+            Key::Char('k') => application.on_cursor_down(),
+            Key::Char('l') => application.on_cursor_right(),
             _ => {}
         }
+
+        application.render_cursor();
 
         application.stdout.flush().unwrap();
     }

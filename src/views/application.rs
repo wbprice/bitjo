@@ -58,14 +58,69 @@ impl<'a> Application<'a> {
         }
     }
 
-    fn render_cursor(&mut self) {
+    pub fn render_cursor(&mut self) {
         if let Some(cursor) = self.cursor {
-            dbg!("render cursor");
+            writeln!(self.stdout, "cursor drawn at {},{}", cursor.col, cursor.row).unwrap();
+        }
+    }
+
+    fn create_cursor_if_not_exist(&mut self) {
+        if let None = self.cursor {
+            self.cursor = Some(Cursor::new());
+        }
+    }
+
+    pub fn on_cursor_left(&mut self) {
+        self.create_cursor_if_not_exist();
+        if let Some(cursor) = self.cursor {
+            if cursor.col > 0 {
+                self.cursor = Some(Cursor {
+                    col: cursor.col - 1,
+                    row: cursor.row
+                })
+            }
+        }
+    }
+
+    pub fn on_cursor_up(&mut self) {
+        self.create_cursor_if_not_exist();
+        if let Some(cursor) = self.cursor {
+            if cursor.row > 0 {
+                self.cursor = Some(Cursor {
+                    col: cursor.col,
+                    row: cursor.row - 1
+                })
+            }
+        }
+    }
+
+    pub fn on_cursor_down(&mut self) {
+        self.create_cursor_if_not_exist();
+        if let Some(cursor) = self.cursor {
+            if cursor.row < 20 {
+                self.cursor = Some(Cursor {
+                    col: cursor.col,
+                    row: cursor.row + 1
+                })
+            }
+        }
+    }
+
+    pub fn on_cursor_right(&mut self) {
+        self.create_cursor_if_not_exist();
+        if let Some(cursor) = self.cursor {
+            if cursor.col < 20 {
+                self.cursor = Some(Cursor {
+                    col: cursor.col + 1,
+                    row: cursor.row
+                })
+            }
         }
     }
 
     pub fn render(&mut self) {
         self.render_header_bar();
         self.render_tasks();
+        self.render_cursor();
     }
 }
