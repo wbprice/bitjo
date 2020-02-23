@@ -39,12 +39,11 @@ fn main() {
         }
     }
 
-    let mut application = Application {
-        stdout: stdout().into_raw_mode().unwrap(),
-        entries: journal.list(),
-    };
+    let mut application: Application = Application::new(journal.list());
 
     application.render();
+
+    // Handle input
 
     let stdin = stdin();
 
