@@ -18,10 +18,16 @@ impl Cursor {
     }
 }
 
+pub enum Mode {
+    Insert,
+    Command
+}
+
 pub struct Application<'a> {
     pub stdout: RawTerminal<Stdout>,
     pub entries: &'a Vec<Entry>,
     pub cursor: Option<Cursor>,
+    pub mode: Mode
 }
 
 impl<'a> Application<'a> {
@@ -29,6 +35,7 @@ impl<'a> Application<'a> {
         Application {
             cursor: None,
             stdout: stdout().into_raw_mode().unwrap(),
+            mode: Mode::Command,
             entries,
         }
     }
