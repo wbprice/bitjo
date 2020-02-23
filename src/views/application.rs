@@ -20,14 +20,14 @@ impl Cursor {
 
 pub enum Mode {
     Insert,
-    Command
+    Command,
 }
 
 pub struct Application<'a> {
     pub stdout: RawTerminal<Stdout>,
     pub entries: &'a Vec<Entry>,
     pub cursor: Option<Cursor>,
-    pub mode: Mode
+    pub mode: Mode,
 }
 
 impl<'a> Application<'a> {
@@ -83,7 +83,7 @@ impl<'a> Application<'a> {
             if cursor.col > 0 {
                 self.cursor = Some(Cursor {
                     col: cursor.col - 1,
-                    row: cursor.row
+                    row: cursor.row,
                 })
             }
         }
@@ -95,7 +95,7 @@ impl<'a> Application<'a> {
             if cursor.row > 0 {
                 self.cursor = Some(Cursor {
                     col: cursor.col,
-                    row: cursor.row - 1
+                    row: cursor.row - 1,
                 })
             }
         }
@@ -107,7 +107,7 @@ impl<'a> Application<'a> {
             if cursor.row < 20 {
                 self.cursor = Some(Cursor {
                     col: cursor.col,
-                    row: cursor.row + 1
+                    row: cursor.row + 1,
                 })
             }
         }
@@ -119,7 +119,7 @@ impl<'a> Application<'a> {
             if cursor.col < 20 {
                 self.cursor = Some(Cursor {
                     col: cursor.col + 1,
-                    row: cursor.row
+                    row: cursor.row,
                 })
             }
         }
