@@ -1,11 +1,8 @@
-use std::io::{Stdin, Stdout, Write};
 use cursor::BlinkingBar;
-use termion::{cursor, event::Key, input::TermRead, clear};
+use std::io::{Stdin, Stdout, Write};
+use termion::{clear, cursor, event::Key, input::TermRead};
 
-use crate::models::{
-    Entry,
-    EntryVariants
-};
+use crate::models::{Entry, EntryVariants, JournalEntry};
 
 #[derive(PartialEq)]
 enum EditorMode {
@@ -17,51 +14,103 @@ pub struct TextArea {
     editor_mode: EditorMode,
     entry_buffer: Option<String>,
     entry_variant: Option<EntryVariants>,
-    entries: Vec<Entry>
+    entries: Vec<Entry>,
 }
 
 impl TextArea {
-
     pub fn new() -> Self {
         return TextArea {
             editor_mode: EditorMode::Normal,
             entry_buffer: Some(String::new()),
             entry_variant: None,
-            entries: vec![]
+            entries: vec![],
+        };
+    }
+
+    fn render_entries(&self, stdout: &mut Stdout) {
+        for entry in self.entries.iter() {
+            write!(stdout, "{}{}\n\r", clear::CurrentLine, entry.render()).unwrap();
         }
     }
 
     pub fn handle_input(&mut self, stdin: Stdin, stdout: &mut Stdout) {
-        write!(stdout, "{}{}", cursor::Goto(1, 3), cursor::Show).unwrap();
+        let mut rows = self.entries.len() as u16;
+        write!(stdout, "{}{}", cursor::Goto(1, 3 + rows), cursor::Show).unwrap();
+
         for c in stdin.keys() {
             match self.editor_mode {
                 EditorMode::Insert => {
-                    write!(stdout, "{}{}", cursor::Goto(1,3), cursor::BlinkingBar).unwrap();
+                    rows = self.entries.len() as u16;
+                    write!(stdout, "{}{}", cursor::Goto(1, 3 + rows), cursor::Show).unwrap();
                     match c.unwrap() {
                         Key::Esc => {
+                            // Commit the entry to the entries list
+                            if let Some(entry_variant) = self.entry_variant.clone() {
+                                if let Some(entry_buffer) = self.entry_buffer.clone() {
+                                    self.entries.push(Entry::new(entry_variant, entry_buffer));
+                                }
+                            }
+
+                            write!(
+                                stdout,
+                                "{}{}",
+                                cursor::Goto(1, 3 + rows),
+                                clear::AfterCursor
+                            )
+                            .unwrap();
+
+                            self.render_entries(stdout);
+                            // Clear any item buffers
+                            self.entry_buffer = None;
+                            self.entry_variant = None;
+                            // Switch the mode back to normal
                             self.editor_mode = EditorMode::Normal;
                         }
                         Key::Backspace => {
                             if let Some(mut buffer) = self.entry_buffer.clone() {
                                 buffer.pop();
-                                self.entry_buffer = Some(buffer.clone());
-                                write!(stdout, "{}{}", clear::CurrentLine, buffer).unwrap();
+                                write!(stdout, "{}{}", clear::CurrentLine, &buffer).unwrap();
+                                self.entry_buffer = Some(buffer);
                             }
+                        }
+                        Key::Char('\n') => {
+                            // Commit the entry to the entries list
+                            if let Some(entry_variant) = self.entry_variant.clone() {
+                                if let Some(entry_buffer) = self.entry_buffer.clone() {
+                                    self.entries.push(Entry::new(entry_variant, entry_buffer));
+                                }
+                            }
+
+                            // Clear the text field
+                            write!(
+                                stdout,
+                                "{}{}",
+                                cursor::Goto(1, 3 + rows),
+                                clear::AfterCursor
+                            )
+                            .unwrap();
+
+                            // Render any entries
+                            self.render_entries(stdout);
+
+                            // Clear any item buffers
+                            self.entry_buffer = None;
+                            self.entry_variant = None;
                         }
                         Key::Char(any_char) => {
                             if let Some(mut buffer) = self.entry_buffer.clone() {
                                 buffer.push(any_char);
-                                self.entry_buffer = Some(buffer.clone());
-                                write!(stdout, "{}", buffer).unwrap();
+                                write!(stdout, "{}", &buffer).unwrap();
+                                self.entry_buffer = Some(buffer);
                             }
                         }
                         _ => {
                             // noop
                         }
                     }
-                },
+                }
                 EditorMode::Normal => {
-                    write!(stdout, "{}{}", cursor::Goto(1,3), cursor::SteadyBlock).unwrap();
+                    write!(stdout, "{}{}", cursor::Goto(1, 3), cursor::SteadyBlock).unwrap();
                     match c.unwrap() {
                         Key::Char('q') => {
                             break;
@@ -70,17 +119,17 @@ impl TextArea {
                         Key::Char('n') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Note);
-                        },
+                        }
                         // Append an event
                         Key::Char('e') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Event);
-                        },
+                        }
                         // Append a todo
                         Key::Char('t') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Task);
-                        },
+                        }
                         // Movement
                         Key::Char('j') => {
                             write!(stdout, "{}", cursor::Down(1)).unwrap(); // up

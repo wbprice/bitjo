@@ -1,10 +1,7 @@
 use std::io::{stdin, stdout, Write};
 use termion::raw::IntoRawMode;
 
-use crate::views::{
-    header_bar::{HeaderBar},
-    text_area::{TextArea}
-};
+use crate::views::{header_bar::HeaderBar, text_area::TextArea};
 
 pub struct Application;
 
