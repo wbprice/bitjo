@@ -40,26 +40,8 @@ impl TextArea {
         for c in stdin.keys() {
             match self.editor_mode {
                 EditorMode::Insert => {
-                    rows = self.entries.len() as u16;
-                    write!(stdout, "{}{}", cursor::Goto(1, 3 + rows), cursor::Show).unwrap();
                     match c.unwrap() {
                         Key::Esc => {
-                            // Commit the entry to the entries list
-                            if let Some(entry_variant) = self.entry_variant.clone() {
-                                if let Some(entry_buffer) = self.entry_buffer.clone() {
-                                    self.entries.push(Entry::new(entry_variant, entry_buffer));
-                                }
-                            }
-
-                            write!(
-                                stdout,
-                                "{}{}",
-                                cursor::Goto(1, 3 + rows),
-                                clear::AfterCursor
-                            )
-                            .unwrap();
-
-                            self.render_entries(stdout);
                             // Clear any item buffers
                             self.entry_buffer = None;
                             self.entry_variant = None;
@@ -85,7 +67,7 @@ impl TextArea {
                             write!(
                                 stdout,
                                 "{}{}",
-                                cursor::Goto(1, 3 + rows),
+                                cursor::Goto(1, 3),
                                 clear::AfterCursor
                             )
                             .unwrap();
@@ -96,6 +78,7 @@ impl TextArea {
                             // Clear any item buffers
                             self.entry_buffer = None;
                             self.entry_variant = None;
+                            self.editor_mode = EditorMode::Normal;
                         }
                         Key::Char(any_char) => {
                             if let Some(mut buffer) = self.entry_buffer.clone() {
