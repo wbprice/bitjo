@@ -1,4 +1,3 @@
-use cursor::BlinkingBar;
 use std::io::{Stdin, Stdout, Write};
 use termion::{clear, cursor, event::Key, input::TermRead};
 
@@ -34,12 +33,33 @@ impl TextArea {
     }
 
     pub fn handle_input(&mut self, stdin: Stdin, stdout: &mut Stdout) {
-        let mut rows = self.entries.len() as u16;
-        write!(stdout, "{}{}", cursor::Goto(1, 3 + rows), cursor::Show).unwrap();
+        let mut changed_editor_mode = false;
 
         for c in stdin.keys() {
+            let entry_count = self.entries.len() as u16;
             match self.editor_mode {
                 EditorMode::Insert => {
+                    // Perform any upfront setup
+                    if changed_editor_mode {
+                        write!(
+                            stdout,
+                            "{}{}{}",
+                            cursor::Goto(1, 3 + entry_count),
+                            cursor::Show,
+                            cursor::BlinkingBar
+                        )
+                        .unwrap();
+                        changed_editor_mode = false;
+                    }
+
+                    write!(
+                        stdout,
+                        "{}{}",
+                        cursor::Goto(1, 3 + entry_count),
+                        clear::CurrentLine
+                    )
+                    .unwrap();
+
                     match c.unwrap() {
                         Key::Esc => {
                             // Clear any item buffers
@@ -47,6 +67,7 @@ impl TextArea {
                             self.entry_variant = None;
                             // Switch the mode back to normal
                             self.editor_mode = EditorMode::Normal;
+                            changed_editor_mode = true;
                         }
                         Key::Backspace => {
                             if let Some(mut buffer) = self.entry_buffer.clone() {
@@ -64,13 +85,7 @@ impl TextArea {
                             }
 
                             // Clear the text field
-                            write!(
-                                stdout,
-                                "{}{}",
-                                cursor::Goto(1, 3),
-                                clear::AfterCursor
-                            )
-                            .unwrap();
+                            write!(stdout, "{}{}", cursor::Goto(1, 3), clear::AfterCursor).unwrap();
 
                             // Render any entries
                             self.render_entries(stdout);
@@ -79,6 +94,7 @@ impl TextArea {
                             self.entry_buffer = None;
                             self.entry_variant = None;
                             self.editor_mode = EditorMode::Normal;
+                            changed_editor_mode = true;
                         }
                         Key::Char(any_char) => {
                             if let Some(mut buffer) = self.entry_buffer.clone() {
@@ -93,7 +109,12 @@ impl TextArea {
                     }
                 }
                 EditorMode::Normal => {
-                    write!(stdout, "{}{}", cursor::Goto(1, 3), cursor::SteadyBlock).unwrap();
+                    // Perform any upfront setup
+                    if changed_editor_mode {
+                        write!(stdout, "{}{}", cursor::Goto(1, 3), cursor::SteadyBlock).unwrap();
+                        changed_editor_mode = false;
+                    }
+
                     match c.unwrap() {
                         Key::Char('q') => {
                             break;
@@ -102,16 +123,19 @@ impl TextArea {
                         Key::Char('n') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Note);
+                            changed_editor_mode = true;
                         }
                         // Append an event
                         Key::Char('e') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Event);
+                            changed_editor_mode = true;
                         }
                         // Append a todo
                         Key::Char('t') => {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Task);
+                            changed_editor_mode = true;
                         }
                         // Movement
                         Key::Char('j') => {
