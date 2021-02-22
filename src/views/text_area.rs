@@ -50,15 +50,8 @@ impl TextArea {
                         )
                         .unwrap();
                         changed_editor_mode = false;
+                        stdout.flush().unwrap();
                     }
-
-                    write!(
-                        stdout,
-                        "{}{}",
-                        cursor::Goto(1, 3 + entry_count),
-                        clear::CurrentLine
-                    )
-                    .unwrap();
 
                     match c.unwrap() {
                         Key::Esc => {
@@ -84,9 +77,6 @@ impl TextArea {
                                 }
                             }
 
-                            // Clear the text field
-                            write!(stdout, "{}{}", cursor::Goto(1, 3), clear::AfterCursor).unwrap();
-
                             // Render any entries
                             self.render_entries(stdout);
 
@@ -111,7 +101,7 @@ impl TextArea {
                 EditorMode::Normal => {
                     // Perform any upfront setup
                     if changed_editor_mode {
-                        write!(stdout, "{}{}", cursor::Goto(1, 3), cursor::SteadyBlock).unwrap();
+                        write!(stdout, "{}", cursor::Hide).unwrap();
                         changed_editor_mode = false;
                     }
 
@@ -136,13 +126,6 @@ impl TextArea {
                             self.editor_mode = EditorMode::Insert;
                             self.entry_variant = Some(EntryVariants::Task);
                             changed_editor_mode = true;
-                        }
-                        // Movement
-                        Key::Char('j') => {
-                            write!(stdout, "{}", cursor::Down(1)).unwrap(); // up
-                        }
-                        Key::Char('k') => {
-                            write!(stdout, "{}", cursor::Up(1)).unwrap();
                         }
                         _ => {
                             // noop
