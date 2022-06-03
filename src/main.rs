@@ -1,43 +1,45 @@
-use structopt::StructOpt;
+trait Entry {
+    fn text(&self) -> &String;
+}
 
-mod controllers;
-mod models;
-mod services;
-mod views;
+struct Note {
+    content: String,
+}
 
-use crate::{
-    controllers::{Command, EntryOpts, Opt},
-    models::{Entry, EntryVariants},
-    services::{Journalable, LocalDiskJournal},
-    views::Application,
-};
+impl Entry for Note {
+    fn text(&self) -> &String {
+        &self.content
+    }
+}
+
+struct Event {
+    content: String,
+}
+
+impl Entry for Event {
+    fn text(&self) -> &String {
+        &self.content
+    }
+}
+
+struct Todo {
+    content: String,
+}
+
+impl Entry for Todo {
+    fn text(&self) -> &String {
+        &self.content
+    }
+}
 
 fn main() {
-    let opt = Opt::from_args();
+    let entries: Vec<Box<dyn Entry>> = vec![
+        Box::new(Note { content: "Hello note!".into() }),
+        Box::new(Event { content: "Hello note!".into() }),
+        Box::new(Todo { content: "Hello todo!".into() })
+    ];
 
-    let mut journal = LocalDiskJournal::new(None);
-
-    // Handle input!
-    if let Some(command) = opt.command {
-        match command {
-            Command::Add { new_entry } => match new_entry {
-                EntryOpts::Event { text } => journal.append(Entry::new(EntryVariants::Event, text)),
-                EntryOpts::Note { text } => journal.append(Entry::new(EntryVariants::Note, text)),
-                EntryOpts::Task { text } => journal.append(Entry::new(EntryVariants::Task, text)),
-            },
-            Command::Emph { index } => {
-                journal.toggle_importance(index);
-            }
-            Command::Complete { index } => {
-                journal.toggle_completion(index);
-            }
-            Command::Remove { index } => journal.remove(index),
-        }
+    for entry in entries {
+        println!("{}", entry.text());
     }
-
-    let application = Application {
-        entries: journal.list(),
-    };
-
-    application.render();
 }
