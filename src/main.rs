@@ -4,18 +4,9 @@ use crate::lib::{Entry, Note, Event, Task};
 
 fn main() {
     let entries: Vec<Box<dyn Entry>> = vec![
-        Box::new(Note {
-            content: "Hello note!".into(),
-            ..Note::default()
-        }),
-        Box::new(Event {
-            content: "Hello event!".into(),
-            ..Event::default()
-        }),
-        Box::new(Task {
-            content: "Hello todo!".into(),
-            ..Task::default()
-        }),
+        Box::new(Note::new("Hello note!".into())),
+        Box::new(Event::new("Hello event!".into())),
+        Box::new(Task::new("Hello todo!".into()))
     ];
 
     for entry in entries {

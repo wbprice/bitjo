@@ -7,6 +7,15 @@ pub struct Task {
     completed: bool,
 }
 
+impl Task {
+    pub fn new(content: String) -> Self {
+        Task {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 impl Entry for Task {
     fn text(&self) -> String {
         format!(

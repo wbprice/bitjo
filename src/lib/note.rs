@@ -6,6 +6,15 @@ pub struct Note {
     important: bool,
 }
 
+impl Note {
+    pub fn new(content: String) -> Self {
+        Note {
+            content,
+            ..Default::default()
+        }
+    }
+}
+
 impl Entry for Note {
     fn text(&self) -> String {
         format!(
