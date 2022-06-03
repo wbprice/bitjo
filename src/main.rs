@@ -1,42 +1,21 @@
-trait Entry {
-    fn text(&self) -> &String;
-}
+mod lib;
 
-struct Note {
-    content: String,
-}
-
-impl Entry for Note {
-    fn text(&self) -> &String {
-        &self.content
-    }
-}
-
-struct Event {
-    content: String,
-}
-
-impl Entry for Event {
-    fn text(&self) -> &String {
-        &self.content
-    }
-}
-
-struct Todo {
-    content: String,
-}
-
-impl Entry for Todo {
-    fn text(&self) -> &String {
-        &self.content
-    }
-}
+use crate::lib::{Entry, Note, Event, Task};
 
 fn main() {
     let entries: Vec<Box<dyn Entry>> = vec![
-        Box::new(Note { content: "Hello note!".into() }),
-        Box::new(Event { content: "Hello note!".into() }),
-        Box::new(Todo { content: "Hello todo!".into() })
+        Box::new(Note {
+            content: "Hello note!".into(),
+            ..Note::default()
+        }),
+        Box::new(Event {
+            content: "Hello event!".into(),
+            ..Event::default()
+        }),
+        Box::new(Task {
+            content: "Hello todo!".into(),
+            ..Task::default()
+        }),
     ];
 
     for entry in entries {
