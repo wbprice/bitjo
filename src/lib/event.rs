@@ -7,11 +7,11 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn new(content: String) -> Self {
-        Event {
+    pub fn new(content: String) -> Box<Self> {
+        Box::new(Event {
             content,
             ..Default::default()
-        }
+        })
     }
 }
 

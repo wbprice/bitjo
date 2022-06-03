@@ -8,11 +8,11 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(content: String) -> Self {
-        Task {
+    pub fn new(content: String) -> Box<Self> {
+        Box::new(Task {
             content,
             ..Default::default()
-        }
+        })
     }
 }
 

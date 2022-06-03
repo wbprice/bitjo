@@ -7,21 +7,21 @@ fn main() {
     let cli = Cli::parse();
 
     let mut entries: Vec<Box<dyn Entry>> = vec![
-        Box::new(Note::new("Hello note!".into())),
-        Box::new(Event::new("Hello event!".into())),
-        Box::new(Task::new("Hello todo!".into())),
+        Note::new("Hello note!".into()),
+        Event::new("Hello event!".into()),
+        Task::new("Hello todo!".into()),
     ];
 
     match &cli.command {
         Commands::Add(add_command) => match add_command {
             AddCommands::Event { content } => {
-                entries.push(Box::new(Event::new(content.into())));
+                entries.push(Event::new(content.into()));
             }
             AddCommands::Note { content } => {
-                entries.push(Box::new(Note::new(content.into())));
+                entries.push(Note::new(content.into()));
             }
             AddCommands::Task { content } => {
-                entries.push(Box::new(Task::new(content.into())));
+                entries.push(Task::new(content.into()));
             }
         },
     }

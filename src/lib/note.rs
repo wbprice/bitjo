@@ -7,11 +7,11 @@ pub struct Note {
 }
 
 impl Note {
-    pub fn new(content: String) -> Self {
-        Note {
+    pub fn new(content: String) -> Box<Self> {
+        Box::new(Note {
             content,
             ..Default::default()
-        }
+        })
     }
 }
 
