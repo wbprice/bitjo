@@ -5,6 +5,7 @@ pub struct Task {
     content: String,
     important: bool,
     completed: bool,
+    children: Vec<Box<dyn Entry>>
 }
 
 impl Task {
@@ -24,5 +25,9 @@ impl Entry for Task {
             symbol = if self.completed { "X" } else { "\u{2022}" },
             content = self.content
         )
+    }
+
+    fn insert(&mut self, entry: Box<dyn Entry>) {
+        self.children.push(entry);
     }
 }

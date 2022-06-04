@@ -4,6 +4,7 @@ use crate::lib::entry::Entry;
 pub struct Note {
     content: String,
     important: bool,
+    children: Vec<Box<dyn Entry>>
 }
 
 impl Note {
@@ -23,5 +24,9 @@ impl Entry for Note {
             symbol = "-",
             content = self.content
         )
+    }
+
+    fn insert(&mut self, entry: Box<dyn Entry>) {
+        self.children.push(entry);
     }
 }
