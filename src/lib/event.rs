@@ -18,12 +18,24 @@ impl Event {
 
 impl Entry for Event {
     fn text(&self) -> String {
-        format!(
-            "{important} {symbol} {content}",
-            important = if self.important { "*" } else { " " },
-            symbol = "\u{26AC}",
-            content = self.content
-        )
+        let mut output = String::new();
+
+        output.push_str(
+            format!(
+                "{important} {symbol} {content}",
+                important = if self.important { "*" } else { " " },
+                symbol = "\u{26AC}",
+                content = self.content
+            )
+            .as_str(),
+        );
+
+        for entry in &self.children {
+            output.push_str("\n    ");
+            output.push_str(entry.text().as_str())
+        }
+
+        output
     }
 
     fn insert(&mut self, entry: Box<dyn Entry>) {
@@ -55,5 +67,8 @@ mod tests {
         let note = Note::new(child.clone());
         event.insert(note);
         assert!(event.children().first().unwrap().text().contains(&child));
+        assert!(event.text().contains(&parent));
+        assert!(event.text().contains(&child));
+        dbg!(event.text());
     }
 }

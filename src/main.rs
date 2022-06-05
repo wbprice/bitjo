@@ -6,11 +6,12 @@ use crate::lib::{AddCommands, Cli, Commands, Entry, Event, Note, Task};
 fn main() {
     let cli = Cli::parse();
 
-    let mut entries: Vec<Box<dyn Entry>> = vec![
-        Note::new("Hello note!".into()),
-        Event::new("Hello event!".into()),
-        Task::new("Hello todo!".into()),
-    ];
+    let note = Note::new("Hello note!".into());
+    let mut event = Event::new("Hello event!".into());
+    let task = Task::new("Hello todo!".into());
+    event.insert(Note::new("Hello child note".into()));
+
+    let mut entries: Vec<Box<dyn Entry>> = vec![note, event, task];
 
     match &cli.command {
         Commands::Add(add_command) => match add_command {
