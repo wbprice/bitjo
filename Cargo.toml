@@ -7,7 +7,7 @@ description = "A Rust note-taking CLI app, inspired by bullet journaling."
 license = "MIT"
 
 [dependencies]
-termion = "1.5.3"
+termion = "1.5.6"
 chrono = "0.4"
 clap = { version = "3.1.18", features = ["derive"] }
 serde = { version = "1.0.104", features = ["derive"] }
