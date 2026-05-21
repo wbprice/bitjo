@@ -21,6 +21,8 @@ pub enum CommandPaneMode {
 pub enum CommandAction {
     Add(EntryKind),
     Quit,
+    Complete,
+    Cancel,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +61,7 @@ enum MatchQuality {
 
 const COMMAND_SEARCH_RESULT_LIMIT: usize = 5;
 
-const COMMAND_OPTIONS: &[CommandOption] = &[
+const COMMAND_PANE_OPTIONS: &[CommandOption] = &[
     CommandOption {
         name: "note",
         token: ":n",
@@ -92,6 +94,20 @@ const COMMAND_OPTIONS: &[CommandOption] = &[
     },
 ];
 
+const COMPLETE_COMMAND_OPTION: CommandOption = CommandOption {
+    name: "complete",
+    token: ":x",
+    aliases: &["x", "done"],
+    action: CommandAction::Complete,
+};
+
+const CANCEL_COMMAND_OPTION: CommandOption = CommandOption {
+    name: "cancel",
+    token: ":c",
+    aliases: &["c", "cancelled"],
+    action: CommandAction::Cancel,
+};
+
 #[derive(Debug)]
 pub struct App {
     pub journal: Journal,
@@ -102,6 +118,7 @@ pub struct App {
     pub selected: Option<usize>,
     pub status: String,
     pub should_quit: bool,
+    command_context: CommandContext,
 }
 
 impl App {
@@ -117,6 +134,7 @@ impl App {
             selected,
             status: String::from("Ready."),
             should_quit: false,
+            command_context: CommandContext::CommandPane,
         }
     }
 
@@ -138,7 +156,7 @@ impl App {
     fn handle_normal_command_key(&mut self, key: KeyEvent) -> io::Result<()> {
         match key.code {
             KeyCode::Char(':') if is_text_input(key.modifiers) => {
-                self.open_command_search();
+                self.open_command_search(CommandContext::CommandPane);
             }
             KeyCode::Esc => self.focus_journal(),
             KeyCode::Enter => {
@@ -168,7 +186,7 @@ impl App {
                     return Ok(());
                 }
 
-                let matches = matching_command_options(&self.command_input);
+                let matches = self.matching_command_options();
                 let Some(command) = matches.get(self.command_result_index).copied() else {
                     self.status = String::from("No matching commands.");
                     return Ok(());
@@ -219,7 +237,7 @@ impl App {
             KeyCode::Up => self.select_previous(),
             KeyCode::Down => self.select_next(),
             KeyCode::Char(':') if is_text_input(key.modifiers) => {
-                self.open_command_search();
+                self.open_command_search(CommandContext::JournalPane);
             }
             _ => {}
         }
@@ -227,11 +245,12 @@ impl App {
         Ok(())
     }
 
-    fn open_command_search(&mut self) {
+    fn open_command_search(&mut self, context: CommandContext) {
         self.focus = Focus::Command;
         self.command_input.clear();
         self.command_mode = CommandPaneMode::Search;
         self.command_result_index = 0;
+        self.command_context = context;
         self.status = String::from("Search commands.");
     }
 
@@ -241,9 +260,11 @@ impl App {
     }
 
     fn execute_command_from_search_input(&mut self) -> io::Result<bool> {
-        if let Some(input) = command_pane_command_from_search_input(&self.command_input) {
+        if let Some((input, context)) =
+            command_from_search_input(&self.command_input, self.command_context)
+        {
             self.reset_command_pane();
-            self.execute_command(&input, CommandContext::CommandPane)?;
+            self.execute_command(&input, context)?;
             return Ok(true);
         }
 
@@ -260,8 +281,12 @@ impl App {
                 self.status = format!("Selected {}.", command.name);
             }
             CommandAction::Quit => {
-                self.command_mode = CommandPaneMode::Normal;
+                self.reset_command_pane();
                 self.execute_command(command.token, CommandContext::CommandPane)?;
+            }
+            CommandAction::Complete | CommandAction::Cancel => {
+                self.reset_command_pane();
+                self.execute_command(command.token, CommandContext::JournalPane)?;
             }
         }
 
@@ -312,6 +337,7 @@ impl App {
                     return Ok(());
                 }
                 self.complete_selected()?;
+                self.focus = Focus::Journal;
             }
             Ok(Command::Cancel) => {
                 if context != CommandContext::JournalPane {
@@ -319,6 +345,7 @@ impl App {
                     return Ok(());
                 }
                 self.cancel_selected()?;
+                self.focus = Focus::Journal;
             }
             Err(message) => {
                 self.status = message;
@@ -329,7 +356,7 @@ impl App {
     }
 
     fn complete_selected(&mut self) -> io::Result<()> {
-        let Some(index) = self.valid_selected_index() else {
+        let Some(index) = self.highlighted_entry_index() else {
             self.status = String::from("No entry selected.");
             return Ok(());
         };
@@ -348,7 +375,7 @@ impl App {
     }
 
     fn cancel_selected(&mut self) -> io::Result<()> {
-        let Some(index) = self.valid_selected_index() else {
+        let Some(index) = self.highlighted_entry_index() else {
             self.status = String::from("No entry selected.");
             return Ok(());
         };
@@ -364,6 +391,11 @@ impl App {
         }
 
         Ok(())
+    }
+
+    fn highlighted_entry_index(&self) -> Option<usize> {
+        let index = self.selected?;
+        (index < self.journal.entries.len()).then_some(index)
     }
 
     fn valid_selected_index(&mut self) -> Option<usize> {
@@ -396,7 +428,7 @@ impl App {
     }
 
     fn normalize_command_result_index(&mut self) {
-        let count = matching_command_options(&self.command_input).len();
+        let count = self.matching_command_options().len();
         if count == 0 {
             self.command_result_index = 0;
         } else {
@@ -411,7 +443,7 @@ impl App {
 
     fn select_next_command_result(&mut self) {
         self.normalize_command_result_index();
-        let count = matching_command_options(&self.command_input).len();
+        let count = self.matching_command_options().len();
         if count > 0 {
             self.command_result_index = (self.command_result_index + 1).min(count - 1);
         }
@@ -421,6 +453,7 @@ impl App {
         self.command_mode = CommandPaneMode::Normal;
         self.command_input.clear();
         self.command_result_index = 0;
+        self.command_context = CommandContext::CommandPane;
     }
 
     pub fn command_title(&self) -> &'static str {
@@ -432,7 +465,7 @@ impl App {
     }
 
     pub fn visible_command_search_results(&self) -> Vec<(usize, CommandSearchResult)> {
-        let results = command_search_results(&self.command_input);
+        let results = self.command_search_results();
         if results.is_empty() {
             return Vec::new();
         }
@@ -455,7 +488,51 @@ impl App {
     }
 
     pub fn command_search_input_is_exact_command(&self) -> bool {
-        command_pane_command_from_search_input(&self.command_input).is_some()
+        command_from_search_input(&self.command_input, self.command_context).is_some()
+    }
+
+    fn command_search_results(&self) -> Vec<CommandSearchResult> {
+        self.matching_command_options()
+            .into_iter()
+            .map(|command| CommandSearchResult {
+                name: command.name,
+                token: command.token,
+            })
+            .collect()
+    }
+
+    fn matching_command_options(&self) -> Vec<&'static CommandOption> {
+        let options = self.available_command_options();
+        matching_command_options(&self.command_input, &options)
+    }
+
+    fn available_command_options(&self) -> Vec<&'static CommandOption> {
+        let mut options = self.entry_action_command_options();
+        options.extend(COMMAND_PANE_OPTIONS.iter());
+        options
+    }
+
+    fn entry_action_command_options(&self) -> Vec<&'static CommandOption> {
+        if self.command_context != CommandContext::JournalPane {
+            return Vec::new();
+        }
+
+        let Some(index) = self.highlighted_entry_index() else {
+            return Vec::new();
+        };
+
+        let entry = &self.journal.entries[index];
+        match entry.kind {
+            EntryKind::Task => {
+                let mut options = vec![&COMPLETE_COMMAND_OPTION];
+                if entry.state != crate::journal::EntryState::Completed {
+                    options.push(&CANCEL_COMMAND_OPTION);
+                }
+                options
+            }
+            EntryKind::Event => vec![&CANCEL_COMMAND_OPTION],
+            EntryKind::Note | EntryKind::Feeling | EntryKind::Raw => Vec::new(),
+        }
     }
 }
 
@@ -468,6 +545,8 @@ impl CommandAction {
             CommandAction::Add(EntryKind::Task) => Some(":t"),
             CommandAction::Add(EntryKind::Raw) => None,
             CommandAction::Quit => Some(":q"),
+            CommandAction::Complete => Some(":x"),
+            CommandAction::Cancel => Some(":c"),
         }
     }
 
@@ -483,7 +562,8 @@ impl CommandAction {
 }
 
 pub fn command_search_results(query: &str) -> Vec<CommandSearchResult> {
-    matching_command_options(query)
+    let options = COMMAND_PANE_OPTIONS.iter().collect::<Vec<_>>();
+    matching_command_options(query, &options)
         .into_iter()
         .map(|command| CommandSearchResult {
             name: command.name,
@@ -492,11 +572,14 @@ pub fn command_search_results(query: &str) -> Vec<CommandSearchResult> {
         .collect()
 }
 
-fn matching_command_options(query: &str) -> Vec<&'static CommandOption> {
-    let mut matches = COMMAND_OPTIONS
+fn matching_command_options(
+    query: &str,
+    options: &[&'static CommandOption],
+) -> Vec<&'static CommandOption> {
+    let mut matches = options
         .iter()
         .enumerate()
-        .filter_map(|(index, command)| {
+        .filter_map(|(index, &command)| {
             command_match_quality(query, command).map(|quality| (quality, index, command))
         })
         .collect::<Vec<_>>();
@@ -560,18 +643,23 @@ fn starts_with_ignore_ascii_case(candidate: &str, query: &str) -> bool {
         .starts_with(&query.to_ascii_lowercase())
 }
 
-fn is_command_pane_command(input: &str) -> bool {
-    matches!(parse_command(input), Ok(Command::Add(_, _) | Command::Quit))
-}
-
-fn command_pane_command_from_search_input(query: &str) -> Option<String> {
+fn command_from_search_input(
+    query: &str,
+    context: CommandContext,
+) -> Option<(String, CommandContext)> {
     let query = query.trim();
     if query.is_empty() {
         return None;
     }
 
     let input = format!(":{query}");
-    is_command_pane_command(&input).then_some(input)
+    match parse_command(&input).ok()? {
+        Command::Add(_, _) | Command::Quit => Some((input, CommandContext::CommandPane)),
+        Command::Complete | Command::Cancel if context == CommandContext::JournalPane => {
+            Some((input, CommandContext::JournalPane))
+        }
+        Command::Complete | Command::Cancel => None,
+    }
 }
 
 pub fn parse_command(input: &str) -> Result<Command, String> {
@@ -657,6 +745,19 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    fn search_result_names(app: &App) -> Vec<&'static str> {
+        app.visible_command_search_results()
+            .into_iter()
+            .map(|(_, result)| result.name)
+            .collect()
+    }
+
+    fn run_journal_search(app: &mut App, input: &str) -> io::Result<()> {
+        app.handle_key(key(KeyCode::Char(':')))?;
+        type_text(app, input)?;
+        app.handle_key(key(KeyCode::Enter))
     }
 
     #[test]
@@ -889,6 +990,158 @@ mod tests {
 
         assert_eq!(app.command_mode, CommandPaneMode::Search);
         assert_eq!(app.status, "No matching commands.");
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn exposes_and_executes_task_actions_for_highlighted_task() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Note, "keep note");
+        app.journal.add_entry(EntryKind::Task, "ship feature");
+        app.selected = Some(1);
+
+        app.handle_key(key(KeyCode::Char(':')))?;
+
+        let names = search_result_names(&app);
+        assert_eq!(names[0], "complete");
+        assert_eq!(names[1], "cancel");
+
+        type_text(&mut app, "complete")?;
+        app.handle_key(key(KeyCode::Enter))?;
+
+        assert_eq!(app.focus, Focus::Journal);
+        assert_eq!(
+            app.journal.entries[1].state,
+            crate::journal::EntryState::Completed
+        );
+        assert_eq!(
+            app.journal.entries[0].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "- keep note\nX ~~ship feature~~\n"
+        );
+
+        run_journal_search(&mut app, "c")?;
+
+        assert_eq!(app.status, "Completed tasks cannot be cancelled.");
+        assert_eq!(
+            app.journal.entries[1].state,
+            crate::journal::EntryState::Completed
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "- keep note\nX ~~ship feature~~\n"
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn exposes_and_executes_event_actions_for_highlighted_event() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Note, "keep note");
+        app.journal.add_entry(EntryKind::Event, "planning");
+        app.journal.add_entry(EntryKind::Task, "ship feature");
+        app.selected = Some(1);
+
+        app.handle_key(key(KeyCode::Char(':')))?;
+
+        let names = search_result_names(&app);
+        assert_eq!(names[0], "cancel");
+        assert!(!names.contains(&"complete"));
+
+        type_text(&mut app, "cancel")?;
+        app.handle_key(key(KeyCode::Enter))?;
+
+        assert_eq!(app.focus, Focus::Journal);
+        assert_eq!(
+            app.journal.entries[1].state,
+            crate::journal::EntryState::Cancelled
+        );
+        assert_eq!(
+            app.journal.entries[0].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            app.journal.entries[2].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "- keep note\n◦ ~~planning~~\n· ship feature\n"
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn hides_entry_actions_for_notes_and_feelings_and_keeps_them_unchanged() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Note, "plain note");
+        app.journal.add_entry(EntryKind::Feeling, "focused");
+        app.journal.add_entry(EntryKind::Task, "ship feature");
+        app.journal.save()?;
+        let before = fs::read_to_string(root.join("2026-05-21.md"))?;
+
+        app.selected = Some(0);
+        app.handle_key(key(KeyCode::Char(':')))?;
+        let note_names = search_result_names(&app);
+        assert!(!note_names.contains(&"complete"));
+        assert!(!note_names.contains(&"cancel"));
+        type_text(&mut app, "x")?;
+        app.handle_key(key(KeyCode::Enter))?;
+
+        app.selected = Some(1);
+        app.handle_key(key(KeyCode::Char(':')))?;
+        let feeling_names = search_result_names(&app);
+        assert!(!feeling_names.contains(&"complete"));
+        assert!(!feeling_names.contains(&"cancel"));
+        type_text(&mut app, "c")?;
+        app.handle_key(key(KeyCode::Enter))?;
+
+        assert_eq!(
+            app.journal.entries[0].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            app.journal.entries[1].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            app.journal.entries[2].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(fs::read_to_string(root.join("2026-05-21.md"))?, before);
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn does_not_apply_actions_without_a_highlighted_entry() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Task, "leave open");
+        app.journal.save()?;
+        app.selected = None;
+
+        run_journal_search(&mut app, "x")?;
+
+        assert_eq!(app.status, "No entry selected.");
+        assert_eq!(app.selected, None);
+        assert_eq!(
+            app.journal.entries[0].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "· leave open\n"
+        );
 
         let _ = fs::remove_dir_all(root);
         Ok(())

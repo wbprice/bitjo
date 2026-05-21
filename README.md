@@ -27,6 +27,10 @@ In fuzzy command search:
 - Selecting `quit` exits immediately.
 - In a selected command entry, `Esc` cancels the entry and returns focus to the
   journal pane.
+- When a task is highlighted, `complete` and `cancel` are available as
+  entry-specific actions.
+- When an event is highlighted, `cancel` is available as an entry-specific
+  action.
 
 Exact command forms also remain available after opening search. For example,
 press `:`, type `n <text>`, and press `Enter` to add a note.
@@ -38,3 +42,6 @@ Available exact commands:
 - `:f <text>` adds a feeling.
 - `:t <text>` adds an incomplete task.
 - `:q` quits.
+- `:x` marks a highlighted task complete or reopens it.
+- `:c` cancels or reopens a highlighted task/event. Completed tasks must be
+  reopened before they can be cancelled.
