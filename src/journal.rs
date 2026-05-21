@@ -1,6 +1,5 @@
 use std::{
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -138,8 +137,7 @@ impl Journal {
     }
 
     pub fn add_entry(&mut self, kind: EntryKind, text: impl Into<String>) {
-        self.entries
-            .push(JournalEntry::new(kind, text, self.date));
+        self.entries.push(JournalEntry::new(kind, text, self.date));
     }
 
     pub fn save(&self) -> io::Result<()> {
@@ -219,7 +217,12 @@ pub fn parse_markdown_line(line: &str, date: NaiveDate) -> JournalEntry {
 }
 
 pub fn format_journal_title(date: NaiveDate) -> String {
-    format!("{}.{}.{}", date.month(), date.day(), weekday_label(date.weekday()))
+    format!(
+        "{}.{}.{}",
+        date.month(),
+        date.day(),
+        weekday_label(date.weekday())
+    )
 }
 
 fn weekday_label(weekday: Weekday) -> &'static str {

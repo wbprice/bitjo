@@ -11,7 +11,7 @@ They dramatically improve the quality of the work you create.
 When asked to implement any feature or make changes, ALWAYS start by asking:
 "Should I create a Spec for this task first?"
 
-IFF user agrees:
+IF user agrees:
 
 - Create a markdown file in `./features/FeatureName.md`
 - Interview the user to clarify:
@@ -20,6 +20,9 @@ IFF user agrees:
 - Scope & constraints
 - Technical considerations
 - Out of scope items
+
+Do not restate information from existing specifications in detail. 
+Instead, include a brief summary and include a link to the original specification. 
 
 ### Phase 2: Review & Refine
 
@@ -53,3 +56,8 @@ ONLY after user types "GO!" or explicitly approves:
 **Remember: Think first, ask clarifying questions, _then_ code. The Spec is your north star.**
 
 (source: https://lukebechtel.com/blog/vibe-speccing)
+
+### Code Quality
+
+Code formatting should follow Rust conventions. Allow cargo fmt changes even if the change seems unrelated to the
+feature being implemented.
