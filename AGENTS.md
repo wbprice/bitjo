@@ -8,12 +8,20 @@ They dramatically improve the quality of the work you create.
 
 ### Phase 1: Requirements First
 
-When asked to implement any feature or make changes, ALWAYS start by asking:
+When asked to implement a feature or a bug fix, or any other changes, ALWAYS start by asking:
 "Should I create a Spec for this task first?"
 
 IF user agrees:
 
+If the user wants to design a new feature:
 - Create a markdown file in `./features/FeatureName.md`
+
+If the user wants to fix a bug:
+- Create a markdown file in `/bugs/BugName.md`
+- Bugs specs should be very tightly scoped and focus on what existing behavior is and what expected behavior should be.
+
+In either case:
+
 - Interview the user to clarify:
 - Purpose & user problem
 - Success criteria
@@ -48,6 +56,10 @@ ONLY after user types "GO!" or explicitly approves:
 /
 ├── features/
 │ ├── FeatureName.md # Shared/committed Specs
+│ └── .local/ # Git-ignored experimental Specs
+│ └── Experiment.md
+├── bugs/
+│ ├── BugName.md # Shared/committed Specs
 │ └── .local/ # Git-ignored experimental Specs
 │ └── Experiment.md
 
