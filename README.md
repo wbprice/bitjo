@@ -19,6 +19,9 @@ The journal pane is focused by default. From the journal pane:
 - `:` opens fuzzy command search in the command pane.
 - `Up` and `Down` move the highlighted journal entry.
 - `Left` and `Right` move to the previous or next journal day.
+- When split view is active, `Left` and `Right` move focus between the two
+  visible days. Pressing past the older or newer edge shifts the two-day window
+  backward or forward.
 
 In fuzzy command search:
 
@@ -27,6 +30,7 @@ In fuzzy command search:
 - `Esc` closes command search and returns focus to the journal pane.
 - Selecting `note`, `event`, `feeling`, or `task` opens a text entry state for
   that command.
+- Selecting `split` toggles split view.
 - Selecting `quit` exits immediately.
 - In a selected command entry, `Esc` cancels the entry and returns focus to the
   journal pane.
@@ -44,6 +48,8 @@ Available exact commands:
 - `:e <text>` adds an event.
 - `:f <text>` adds a feeling.
 - `:t <text>` adds an incomplete task.
+- `:split` toggles a two-day journal view, initially showing yesterday and
+  today.
 - `:q` quits.
 - `:x` marks a highlighted task complete or reopens it.
 - `:c` cancels or reopens a highlighted task/event. Completed tasks must be
