@@ -2,6 +2,8 @@
 
 A Rust/ratatui terminal app for rapid bullet-journal logging.
 
+<img width="864" height="468" alt="image" src="https://github.com/user-attachments/assets/62eff046-ddad-4f1e-b940-5b9dc0ae931a" />
+
 ## Run
 
 ```sh
