@@ -11,13 +11,15 @@ They dramatically improve the quality of the work you create.
 When asked to implement a feature or a bug fix, or any other changes, ALWAYS start by asking:
 "Should I create a Spec for this task first?"
 
-IF user agrees:
+If user agrees:
 
 If the user wants to design a new feature:
+- Checkout a new branch created from the active branch named `feature-feature-name`
 - Track the new file in Git
 - Create a markdown file in `./features/FeatureName.md`
 
 If the user wants to fix a bug:
+- Checkout a new branch created from the active branch named `bug-feature-name`
 - Create a markdown file in `/bugs/BugName.md`
 - Track the new file in Git
 - Bugs specs should be very tightly scoped and focus on what existing behavior is and what expected behavior should be.

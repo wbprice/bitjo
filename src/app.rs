@@ -1153,7 +1153,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "- keep note\nX ~~ship feature~~\n"
+            "- keep note\nX ship feature\n"
         );
 
         run_journal_search(&mut app, "c")?;
@@ -1165,7 +1165,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "- keep note\nX ~~ship feature~~\n"
+            "- keep note\nX ship feature\n"
         );
 
         let _ = fs::remove_dir_all(root);

@@ -4,6 +4,9 @@
 
 Implemented.
 
+Correction: completed-task strikethrough behavior is superseded by
+[Completed Tasks No Strikethrough](../bugs/CompletedTasksNoStrikethrough.md).
+
 ## Related Specifications
 
 This feature extends the implemented [Bullet Journal TUI](./BulletJournalTUI.md)
