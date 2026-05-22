@@ -14,10 +14,12 @@ When asked to implement a feature or a bug fix, or any other changes, ALWAYS sta
 IF user agrees:
 
 If the user wants to design a new feature:
+- Track the new file in Git
 - Create a markdown file in `./features/FeatureName.md`
 
 If the user wants to fix a bug:
 - Create a markdown file in `/bugs/BugName.md`
+- Track the new file in Git
 - Bugs specs should be very tightly scoped and focus on what existing behavior is and what expected behavior should be.
 
 In either case:
