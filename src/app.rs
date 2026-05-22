@@ -309,7 +309,7 @@ impl App {
             KeyCode::Down => self.select_next(),
             KeyCode::Left => self.navigate_left()?,
             KeyCode::Right => self.navigate_right()?,
-            KeyCode::Char(':') if is_text_input(key.modifiers) => {
+            KeyCode::Char(character) if opens_journal_command_search(character, key.modifiers) => {
                 self.open_command_search(CommandContext::JournalPane);
             }
             _ => {}
@@ -1061,6 +1061,10 @@ fn is_text_input(modifiers: KeyModifiers) -> bool {
     !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
 }
 
+fn opens_journal_command_search(character: char, modifiers: KeyModifiers) -> bool {
+    matches!(character, ':' | ' ') && is_text_input(modifiers)
+}
+
 fn last_entry_index(journal: &Journal) -> Option<usize> {
     journal.entries.len().checked_sub(1)
 }
@@ -1175,6 +1179,65 @@ mod tests {
 
         assert_eq!(app.focus, Focus::Journal);
         assert_eq!(app.command_mode, CommandPaneMode::Normal);
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn space_opens_command_search_from_focused_journal() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        app.handle_key(key(KeyCode::Char(' ')))?;
+
+        assert_eq!(app.focus, Focus::Command);
+        assert_eq!(app.command_mode, CommandPaneMode::Search);
+        assert_eq!(app.command_context, CommandContext::JournalPane);
+        assert!(app.command_input.is_empty());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn space_opens_journal_command_search_with_highlighted_entry_actions() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Task, "ship feature");
+        app.selected = Some(0);
+
+        app.handle_key(key(KeyCode::Char(' ')))?;
+
+        let names = search_result_names(&app);
+        assert_eq!(names[0], "complete");
+        assert_eq!(names[1], "cancel");
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn space_remains_literal_input_in_command_text_modes() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        app.focus = Focus::Command;
+        app.handle_key(key(KeyCode::Char(' ')))?;
+        assert_eq!(app.focus, Focus::Command);
+        assert_eq!(app.command_mode, CommandPaneMode::Normal);
+        assert_eq!(app.command_input, " ");
+
+        app.open_command_search(CommandContext::CommandPane);
+        app.handle_key(key(KeyCode::Char(' ')))?;
+        assert_eq!(app.command_mode, CommandPaneMode::Search);
+        assert_eq!(app.command_input, " ");
+
+        app.command_mode = CommandPaneMode::Entry(CommandAction::Add(EntryKind::Note));
+        app.command_input = String::from("draft");
+        app.handle_key(key(KeyCode::Char(' ')))?;
+        assert_eq!(
+            app.command_mode,
+            CommandPaneMode::Entry(CommandAction::Add(EntryKind::Note))
+        );
+        assert_eq!(app.command_input, "draft ");
 
         let _ = fs::remove_dir_all(root);
         Ok(())
