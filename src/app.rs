@@ -306,9 +306,13 @@ impl App {
         match key.code {
             KeyCode::Esc => self.focus_journal(),
             KeyCode::Up => self.select_previous(),
+            KeyCode::Char('k') if is_unmodified_key(key.modifiers) => self.select_previous(),
             KeyCode::Down => self.select_next(),
+            KeyCode::Char('j') if is_unmodified_key(key.modifiers) => self.select_next(),
             KeyCode::Left => self.navigate_left()?,
+            KeyCode::Char('h') if is_unmodified_key(key.modifiers) => self.navigate_left()?,
             KeyCode::Right => self.navigate_right()?,
+            KeyCode::Char('l') if is_unmodified_key(key.modifiers) => self.navigate_right()?,
             KeyCode::Char(':') if is_text_input(key.modifiers) => {
                 self.open_command_search(CommandContext::JournalPane);
             }
@@ -1061,6 +1065,10 @@ fn is_text_input(modifiers: KeyModifiers) -> bool {
     !modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
 }
 
+fn is_unmodified_key(modifiers: KeyModifiers) -> bool {
+    modifiers == KeyModifiers::NONE
+}
+
 fn last_entry_index(journal: &Journal) -> Option<usize> {
     journal.entries.len().checked_sub(1)
 }
@@ -1214,6 +1222,41 @@ mod tests {
     }
 
     #[test]
+    fn navigates_single_journal_with_vim_keys() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("2026-05-20.md"), "- yesterday note\n")?;
+        app.journal.add_entry(EntryKind::Note, "today one");
+        app.journal.add_entry(EntryKind::Note, "today two");
+        app.journal.add_entry(EntryKind::Note, "today three");
+        app.selected = Some(1);
+
+        app.handle_key(key(KeyCode::Char('k')))?;
+        assert_eq!(app.selected, Some(0));
+
+        app.handle_key(key(KeyCode::Char('j')))?;
+        assert_eq!(app.selected, Some(1));
+
+        app.handle_key(key(KeyCode::Char('h')))?;
+
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(app.journal.entries[0].text, "yesterday note");
+        assert_eq!(app.selected, Some(0));
+
+        app.handle_key(key(KeyCode::Char('l')))?;
+
+        assert_eq!(app.journal.date, date());
+        assert!(app.journal.entries.is_empty());
+        assert_eq!(app.selected, None);
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
     fn switching_to_empty_day_does_not_create_file() -> io::Result<()> {
         let (mut app, root) = test_app()?;
 
@@ -1334,6 +1377,79 @@ mod tests {
         assert_eq!(split.newer.journal.date, date());
         assert_eq!(split.active, SplitPane::Newer);
         assert_eq!(app.journal.date, date());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_navigates_with_vim_keys() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("2026-05-20.md"),
+            "- yesterday one\n- yesterday two\n",
+        )?;
+        fs::write(
+            root.join("2026-05-21.md"),
+            "- today one\n- today two\n- today three\n",
+        )?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Char('k')))?;
+        assert_eq!(app.selected, Some(1));
+        assert_eq!(
+            app.split.as_ref().expect("split view").newer.selected,
+            Some(1)
+        );
+
+        app.handle_key(key(KeyCode::Char('h')))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Older);
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(app.selected, Some(1));
+
+        app.handle_key(key(KeyCode::Char('k')))?;
+        assert_eq!(app.selected, Some(0));
+
+        app.handle_key(key(KeyCode::Char('j')))?;
+        assert_eq!(app.selected, Some(1));
+
+        app.handle_key(key(KeyCode::Char('h')))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()
+        );
+        assert_eq!(
+            split.newer.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.active, SplitPane::Older);
+
+        app.handle_key(key(KeyCode::Char('l')))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Newer);
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+
+        app.handle_key(key(KeyCode::Char('l')))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.newer.journal.date, date());
+        assert_eq!(split.active, SplitPane::Newer);
 
         let _ = fs::remove_dir_all(root);
         Ok(())
@@ -1671,6 +1787,32 @@ mod tests {
 
         assert_eq!(app.command_mode, CommandPaneMode::Search);
         assert_eq!(app.status, "No matching commands.");
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn command_text_inputs_keep_vim_keys_as_text() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        app.handle_key(key(KeyCode::Char(':')))?;
+        type_text(&mut app, "hjkl")?;
+        assert_eq!(app.focus, Focus::Command);
+        assert_eq!(app.command_mode, CommandPaneMode::Search);
+        assert_eq!(app.command_input, "hjkl");
+
+        app.handle_key(key(KeyCode::Esc))?;
+        app.handle_key(key(KeyCode::Char(':')))?;
+        type_text(&mut app, "n")?;
+        app.handle_key(key(KeyCode::Enter))?;
+        type_text(&mut app, "hjkl")?;
+
+        assert_eq!(
+            app.command_mode,
+            CommandPaneMode::Entry(CommandAction::Add(EntryKind::Note))
+        );
+        assert_eq!(app.command_input, "hjkl");
 
         let _ = fs::remove_dir_all(root);
         Ok(())
