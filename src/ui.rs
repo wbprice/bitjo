@@ -7,9 +7,11 @@ use ratatui::{
 };
 
 use crate::{
-    app::{App, CommandPaneMode, Focus},
-    journal::{EntryKind, JournalEntry},
+    app::{App, CommandPaneMode, Focus, SplitJournalView, SplitPane},
+    journal::{EntryKind, Journal, JournalEntry},
 };
+
+const SPLIT_SIDE_BY_SIDE_MIN_WIDTH: u16 = 100;
 
 pub fn draw(frame: &mut Frame, app: &App) {
     let command_height = command_pane_height(app);
@@ -18,33 +20,85 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .constraints([Constraint::Min(1), Constraint::Length(command_height)])
         .split(frame.area());
 
-    draw_journal(frame, chunks[0], app);
+    draw_journal_area(frame, chunks[0], app);
     draw_command(frame, chunks[1], app);
 }
 
-fn draw_journal(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
-    let is_focused = matches!(app.focus, Focus::Journal);
-    let block = Block::default()
-        .title(app.journal.title())
-        .borders(Borders::ALL)
-        .border_style(border_style(is_focused));
+fn draw_journal_area(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    if let Some(split) = app.split_view() {
+        draw_split_journal(frame, area, app, split);
+    } else {
+        draw_journal(
+            frame,
+            area,
+            &app.journal,
+            app.selected,
+            matches!(app.focus, Focus::Journal),
+            matches!(app.focus, Focus::Journal),
+        );
+    }
+}
 
-    let items = if app.journal.entries.is_empty() {
+fn draw_split_journal(
+    frame: &mut Frame,
+    area: ratatui::layout::Rect,
+    app: &App,
+    split: &SplitJournalView,
+) {
+    let direction = if area.width >= SPLIT_SIDE_BY_SIDE_MIN_WIDTH {
+        Direction::Horizontal
+    } else {
+        Direction::Vertical
+    };
+
+    let chunks = Layout::default()
+        .direction(direction)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    draw_journal(
+        frame,
+        chunks[0],
+        &split.older.journal,
+        split.older.selected,
+        split.active == SplitPane::Older,
+        matches!(app.focus, Focus::Journal) && split.active == SplitPane::Older,
+    );
+    draw_journal(
+        frame,
+        chunks[1],
+        &split.newer.journal,
+        split.newer.selected,
+        split.active == SplitPane::Newer,
+        matches!(app.focus, Focus::Journal) && split.active == SplitPane::Newer,
+    );
+}
+
+fn draw_journal(
+    frame: &mut Frame,
+    area: ratatui::layout::Rect,
+    journal: &Journal,
+    selected: Option<usize>,
+    is_active: bool,
+    show_selection: bool,
+) {
+    let block = Block::default()
+        .title(journal.title())
+        .borders(Borders::ALL)
+        .border_style(border_style(is_active));
+
+    let items = if journal.entries.is_empty() {
         vec![ListItem::new(Line::from(Span::styled(
             "No entries yet.",
             Style::default().fg(Color::DarkGray),
         )))]
     } else {
-        app.journal
-            .entries
-            .iter()
-            .map(entry_item)
-            .collect::<Vec<_>>()
+        journal.entries.iter().map(entry_item).collect::<Vec<_>>()
     };
 
     let mut state = ListState::default();
-    if is_focused {
-        state.select(app.selected);
+    if show_selection {
+        state.select(selected);
     }
 
     let list = List::new(items).block(block).highlight_style(
@@ -184,6 +238,7 @@ mod tests {
     };
 
     use chrono::NaiveDate;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::{backend::TestBackend, buffer::Buffer, Terminal};
 
     use crate::{
@@ -215,12 +270,46 @@ mod tests {
         Ok((app, root))
     }
 
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn type_text(app: &mut App, text: &str) -> io::Result<()> {
+        for character in text.chars() {
+            app.handle_key(key(KeyCode::Char(character)))?;
+        }
+
+        Ok(())
+    }
+
+    fn toggle_split(app: &mut App) -> io::Result<()> {
+        app.handle_key(key(KeyCode::Char(':')))?;
+        type_text(app, "split")?;
+        app.handle_key(key(KeyCode::Enter))
+    }
+
+    fn split_app() -> io::Result<(App, PathBuf)> {
+        let root = test_root();
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("2026-05-20.md"), "- yesterday note\n")?;
+        fs::write(root.join("2026-05-21.md"), "- today note\n")?;
+
+        let journal = Journal::load_for_date(&root, date())?;
+        let mut app = App::new(journal);
+        toggle_split(&mut app)?;
+        Ok((app, root))
+    }
+
     fn render_text(app: &App) -> io::Result<String> {
         Ok(buffer_text(&render_buffer(app)?))
     }
 
     fn render_buffer(app: &App) -> io::Result<Buffer> {
-        let backend = TestBackend::new(80, 20);
+        render_buffer_with_size(app, 80, 20)
+    }
+
+    fn render_buffer_with_size(app: &App, width: u16, height: u16) -> io::Result<Buffer> {
+        let backend = TestBackend::new(width, height);
         let mut terminal = Terminal::new(backend)?;
         terminal.draw(|frame| draw(frame, app))?;
         Ok(terminal.backend().buffer().clone())
@@ -254,6 +343,19 @@ mod tests {
         panic!("rendered buffer did not contain {needle:?}");
     }
 
+    fn row_containing(buffer: &Buffer, needle: &str) -> usize {
+        let width = buffer.area.width as usize;
+
+        for (row_index, row) in buffer.content().chunks(width).enumerate() {
+            let row_text = row.iter().map(|cell| cell.symbol()).collect::<String>();
+            if row_text.contains(needle) {
+                return row_index;
+            }
+        }
+
+        panic!("rendered buffer did not contain {needle:?}");
+    }
+
     #[test]
     fn strikes_cancelled_entries_but_not_completed_tasks() -> io::Result<()> {
         let root = test_root();
@@ -270,6 +372,40 @@ mod tests {
 
         assert!(!modifier_for_text(&buffer, "completed task").contains(Modifier::CROSSED_OUT));
         assert!(modifier_for_text(&buffer, "cancelled task").contains(Modifier::CROSSED_OUT));
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_journal_renders_side_by_side_on_wide_screens() -> io::Result<()> {
+        let (app, root) = split_app()?;
+
+        let buffer = render_buffer_with_size(&app, 120, 24)?;
+        let older_title_row = row_containing(&buffer, "5.20.W");
+        let newer_title_row = row_containing(&buffer, "5.21.Th");
+        let rendered = buffer_text(&buffer);
+
+        assert_eq!(older_title_row, newer_title_row);
+        assert!(rendered.contains("yesterday note"));
+        assert!(rendered.contains("today note"));
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_journal_renders_stacked_on_narrow_screens() -> io::Result<()> {
+        let (app, root) = split_app()?;
+
+        let buffer = render_buffer_with_size(&app, 80, 24)?;
+        let older_title_row = row_containing(&buffer, "5.20.W");
+        let newer_title_row = row_containing(&buffer, "5.21.Th");
+        let rendered = buffer_text(&buffer);
+
+        assert!(older_title_row < newer_title_row);
+        assert!(rendered.contains("yesterday note"));
+        assert!(rendered.contains("today note"));
 
         let _ = fs::remove_dir_all(root);
         Ok(())

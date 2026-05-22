@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chrono::Days;
+use chrono::{Days, NaiveDate};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::journal::{EntryKind, Journal};
@@ -25,6 +25,7 @@ pub enum CommandPaneMode {
 pub enum CommandAction {
     Add(EntryKind),
     Quit,
+    Split,
     Complete,
     Cancel,
 }
@@ -33,6 +34,7 @@ pub enum CommandAction {
 pub enum Command {
     Add(EntryKind, String),
     Quit,
+    ToggleSplit,
     Complete,
     Cancel,
 }
@@ -55,6 +57,57 @@ struct CommandOption {
 pub struct CommandSearchResult {
     pub name: &'static str,
     pub token: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitPane {
+    Older,
+    Newer,
+}
+
+#[derive(Debug, Clone)]
+pub struct JournalPane {
+    pub journal: Journal,
+    pub selected: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SplitJournalView {
+    pub older: JournalPane,
+    pub newer: JournalPane,
+    pub active: SplitPane,
+}
+
+impl JournalPane {
+    fn new(journal: Journal) -> Self {
+        let selected = last_entry_index(&journal);
+
+        Self { journal, selected }
+    }
+}
+
+impl SplitJournalView {
+    pub fn pane(&self, pane: SplitPane) -> &JournalPane {
+        match pane {
+            SplitPane::Older => &self.older,
+            SplitPane::Newer => &self.newer,
+        }
+    }
+
+    fn pane_mut(&mut self, pane: SplitPane) -> &mut JournalPane {
+        match pane {
+            SplitPane::Older => &mut self.older,
+            SplitPane::Newer => &mut self.newer,
+        }
+    }
+
+    pub fn active_pane(&self) -> &JournalPane {
+        self.pane(self.active)
+    }
+
+    fn active_pane_mut(&mut self) -> &mut JournalPane {
+        self.pane_mut(self.active)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -96,6 +149,12 @@ const COMMAND_PANE_OPTIONS: &[CommandOption] = &[
         aliases: &["q", "exit"],
         action: CommandAction::Quit,
     },
+    CommandOption {
+        name: "split",
+        token: ":split",
+        aliases: &["compare", "dual"],
+        action: CommandAction::Split,
+    },
 ];
 
 const COMPLETE_COMMAND_OPTION: CommandOption = CommandOption {
@@ -123,6 +182,8 @@ pub struct App {
     pub status: String,
     pub should_quit: bool,
     journal_root: PathBuf,
+    today: NaiveDate,
+    split: Option<SplitJournalView>,
     command_context: CommandContext,
 }
 
@@ -130,6 +191,7 @@ impl App {
     pub fn new(journal: Journal) -> Self {
         let selected = last_entry_index(&journal);
         let journal_root = journal_root(&journal);
+        let today = journal.date;
 
         Self {
             journal,
@@ -141,6 +203,8 @@ impl App {
             status: String::from("Ready."),
             should_quit: false,
             journal_root,
+            today,
+            split: None,
             command_context: CommandContext::CommandPane,
         }
     }
@@ -243,8 +307,8 @@ impl App {
             KeyCode::Esc => self.focus_journal(),
             KeyCode::Up => self.select_previous(),
             KeyCode::Down => self.select_next(),
-            KeyCode::Left => self.switch_to_previous_day(),
-            KeyCode::Right => self.switch_to_next_day(),
+            KeyCode::Left => self.navigate_left()?,
+            KeyCode::Right => self.navigate_right()?,
             KeyCode::Char(':') if is_text_input(key.modifiers) => {
                 self.open_command_search(CommandContext::JournalPane);
             }
@@ -252,6 +316,24 @@ impl App {
         }
 
         Ok(())
+    }
+
+    fn navigate_left(&mut self) -> io::Result<()> {
+        if self.split.is_some() {
+            self.navigate_split_left()
+        } else {
+            self.switch_to_previous_day();
+            Ok(())
+        }
+    }
+
+    fn navigate_right(&mut self) -> io::Result<()> {
+        if self.split.is_some() {
+            self.navigate_split_right()
+        } else {
+            self.switch_to_next_day();
+            Ok(())
+        }
     }
 
     fn switch_to_previous_day(&mut self) {
@@ -326,6 +408,10 @@ impl App {
                 self.reset_command_pane();
                 self.execute_command(command.token, CommandContext::CommandPane)?;
             }
+            CommandAction::Split => {
+                self.reset_command_pane();
+                self.execute_command(command.token, CommandContext::CommandPane)?;
+            }
             CommandAction::Complete | CommandAction::Cancel => {
                 self.reset_command_pane();
                 self.execute_command(command.token, CommandContext::JournalPane)?;
@@ -362,16 +448,21 @@ impl App {
                     return Ok(());
                 }
 
-                self.journal.add_entry(kind, text);
-                self.journal.save()?;
-                self.selected = last_entry_index(&self.journal);
-                self.status = format!("Wrote {}.", self.journal.path().display());
+                let path = self.add_entry_to_active_journal(kind, text)?;
+                self.status = format!("Wrote {}.", path.display());
                 if kind == EntryKind::Note {
                     self.focus = Focus::Journal;
                 }
             }
             Ok(Command::Quit) => {
                 self.should_quit = true;
+            }
+            Ok(Command::ToggleSplit) => {
+                if context != CommandContext::CommandPane {
+                    self.status = String::from("Split is available in the command pane.");
+                    return Ok(());
+                }
+                self.toggle_split_view();
             }
             Ok(Command::Complete) => {
                 if context != CommandContext::JournalPane {
@@ -397,11 +488,187 @@ impl App {
         Ok(())
     }
 
+    fn toggle_split_view(&mut self) {
+        if let Some(split) = self.split.take() {
+            let pane = match split.active {
+                SplitPane::Older => split.older,
+                SplitPane::Newer => split.newer,
+            };
+            self.journal = pane.journal;
+            self.selected = pane.selected;
+            self.focus = Focus::Journal;
+            self.status = format!(
+                "Split view off. Loaded {}.",
+                self.journal.date.format("%Y-%m-%d")
+            );
+            return;
+        }
+
+        let Some(older_date) = self.today.checked_sub_days(Days::new(1)) else {
+            self.status = String::from("Cannot split before the supported date range.");
+            return;
+        };
+
+        match self.load_split_window(older_date, SplitPane::Newer) {
+            Ok(split) => {
+                self.split = Some(split);
+                self.sync_active_journal_from_split();
+                self.focus = Focus::Journal;
+                if let Some(split) = &self.split {
+                    self.status = format!(
+                        "Split view on: {} and {}.",
+                        split.older.journal.date.format("%Y-%m-%d"),
+                        split.newer.journal.date.format("%Y-%m-%d")
+                    );
+                }
+            }
+            Err(error) => {
+                self.status = format!("Could not load split view: {error}");
+            }
+        }
+    }
+
+    fn load_split_window(
+        &self,
+        older_date: NaiveDate,
+        active: SplitPane,
+    ) -> io::Result<SplitJournalView> {
+        let newer_date = older_date.checked_add_days(Days::new(1)).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Cannot split after the supported date range.",
+            )
+        })?;
+
+        Ok(SplitJournalView {
+            older: JournalPane::new(Journal::load_for_date(&self.journal_root, older_date)?),
+            newer: JournalPane::new(Journal::load_for_date(&self.journal_root, newer_date)?),
+            active,
+        })
+    }
+
+    fn navigate_split_left(&mut self) -> io::Result<()> {
+        let Some(split) = &self.split else {
+            return Ok(());
+        };
+
+        if split.active == SplitPane::Newer {
+            self.set_active_split_pane(SplitPane::Older);
+            return Ok(());
+        }
+
+        let Some(new_older_date) = split.older.journal.date.checked_sub_days(Days::new(1)) else {
+            self.status = String::from("Cannot switch before the supported date range.");
+            return Ok(());
+        };
+
+        let new_older = match Journal::load_for_date(&self.journal_root, new_older_date) {
+            Ok(journal) => JournalPane::new(journal),
+            Err(error) => {
+                self.status = format!(
+                    "Could not load {}: {error}",
+                    new_older_date.format("%Y-%m-%d")
+                );
+                return Ok(());
+            }
+        };
+
+        if let Some(split) = &mut self.split {
+            let previous_older = std::mem::replace(&mut split.older, new_older);
+            split.newer = previous_older;
+            split.active = SplitPane::Older;
+        }
+
+        self.sync_active_journal_from_split();
+        self.status = format!("Loaded {}.", self.journal.date.format("%Y-%m-%d"));
+        Ok(())
+    }
+
+    fn navigate_split_right(&mut self) -> io::Result<()> {
+        let Some(split) = &self.split else {
+            return Ok(());
+        };
+
+        if split.active == SplitPane::Older {
+            self.set_active_split_pane(SplitPane::Newer);
+            return Ok(());
+        }
+
+        let Some(new_newer_date) = split.newer.journal.date.checked_add_days(Days::new(1)) else {
+            self.status = String::from("Cannot switch after the supported date range.");
+            return Ok(());
+        };
+
+        let new_newer = match Journal::load_for_date(&self.journal_root, new_newer_date) {
+            Ok(journal) => JournalPane::new(journal),
+            Err(error) => {
+                self.status = format!(
+                    "Could not load {}: {error}",
+                    new_newer_date.format("%Y-%m-%d")
+                );
+                return Ok(());
+            }
+        };
+
+        if let Some(split) = &mut self.split {
+            let previous_newer = std::mem::replace(&mut split.newer, new_newer);
+            split.older = previous_newer;
+            split.active = SplitPane::Newer;
+        }
+
+        self.sync_active_journal_from_split();
+        self.status = format!("Loaded {}.", self.journal.date.format("%Y-%m-%d"));
+        Ok(())
+    }
+
+    fn set_active_split_pane(&mut self, active: SplitPane) {
+        if let Some(split) = &mut self.split {
+            split.active = active;
+        }
+
+        self.sync_active_journal_from_split();
+        self.status = format!("Focused {}.", self.journal.date.format("%Y-%m-%d"));
+    }
+
+    fn add_entry_to_active_journal(
+        &mut self,
+        kind: EntryKind,
+        text: String,
+    ) -> io::Result<PathBuf> {
+        if let Some(split) = &mut self.split {
+            let pane = split.active_pane_mut();
+            pane.journal.add_entry(kind, text);
+            pane.journal.save()?;
+            pane.selected = last_entry_index(&pane.journal);
+            let path = pane.journal.path().to_path_buf();
+            self.sync_active_journal_from_split();
+            return Ok(path);
+        }
+
+        self.journal.add_entry(kind, text);
+        self.journal.save()?;
+        self.selected = last_entry_index(&self.journal);
+        Ok(self.journal.path().to_path_buf())
+    }
+
     fn complete_selected(&mut self) -> io::Result<()> {
         let Some(index) = self.highlighted_entry_index() else {
             self.status = String::from("No entry selected.");
             return Ok(());
         };
+
+        if let Some(split) = &mut self.split {
+            let pane = split.active_pane_mut();
+            self.status = match pane.journal.entries[index].toggle_complete() {
+                Ok(message) => {
+                    pane.journal.save()?;
+                    message.to_string()
+                }
+                Err(message) => message.to_string(),
+            };
+            self.sync_active_journal_from_split();
+            return Ok(());
+        }
 
         match self.journal.entries[index].toggle_complete() {
             Ok(message) => {
@@ -422,6 +689,19 @@ impl App {
             return Ok(());
         };
 
+        if let Some(split) = &mut self.split {
+            let pane = split.active_pane_mut();
+            self.status = match pane.journal.entries[index].toggle_cancel() {
+                Ok(message) => {
+                    pane.journal.save()?;
+                    message.to_string()
+                }
+                Err(message) => message.to_string(),
+            };
+            self.sync_active_journal_from_split();
+            return Ok(());
+        }
+
         match self.journal.entries[index].toggle_cancel() {
             Ok(message) => {
                 self.journal.save()?;
@@ -436,19 +716,20 @@ impl App {
     }
 
     fn highlighted_entry_index(&self) -> Option<usize> {
-        let index = self.selected?;
-        (index < self.journal.entries.len()).then_some(index)
+        let index = self.active_selected()?;
+        (index < self.active_journal().entries.len()).then_some(index)
     }
 
     fn valid_selected_index(&mut self) -> Option<usize> {
-        if self.journal.entries.is_empty() {
-            self.selected = None;
+        let entry_count = self.active_journal().entries.len();
+        if entry_count == 0 {
+            self.set_active_selected(None);
             return None;
         }
 
-        let max = self.journal.entries.len() - 1;
-        let index = self.selected.unwrap_or(max).min(max);
-        self.selected = Some(index);
+        let max = entry_count - 1;
+        let index = self.active_selected().unwrap_or(max).min(max);
+        self.set_active_selected(Some(index));
         Some(index)
     }
 
@@ -457,7 +738,7 @@ impl App {
             return;
         };
 
-        self.selected = Some(index.saturating_sub(1));
+        self.set_active_selected(Some(index.saturating_sub(1)));
     }
 
     fn select_next(&mut self) {
@@ -465,8 +746,42 @@ impl App {
             return;
         };
 
-        let max = self.journal.entries.len() - 1;
-        self.selected = Some((index + 1).min(max));
+        let max = self.active_journal().entries.len() - 1;
+        self.set_active_selected(Some((index + 1).min(max)));
+    }
+
+    fn active_journal(&self) -> &Journal {
+        self.split
+            .as_ref()
+            .map(|split| &split.active_pane().journal)
+            .unwrap_or(&self.journal)
+    }
+
+    fn active_selected(&self) -> Option<usize> {
+        self.split
+            .as_ref()
+            .map(|split| split.active_pane().selected)
+            .unwrap_or(self.selected)
+    }
+
+    fn set_active_selected(&mut self, selected: Option<usize>) {
+        if let Some(split) = &mut self.split {
+            split.active_pane_mut().selected = selected;
+            self.sync_active_journal_from_split();
+        } else {
+            self.selected = selected;
+        }
+    }
+
+    fn sync_active_journal_from_split(&mut self) {
+        if let Some(split) = &self.split {
+            self.journal = split.active_pane().journal.clone();
+            self.selected = split.active_pane().selected;
+        }
+    }
+
+    pub fn split_view(&self) -> Option<&SplitJournalView> {
+        self.split.as_ref()
     }
 
     fn normalize_command_result_index(&mut self) {
@@ -563,7 +878,7 @@ impl App {
             return Vec::new();
         };
 
-        let entry = &self.journal.entries[index];
+        let entry = &self.active_journal().entries[index];
         match entry.kind {
             EntryKind::Task => {
                 let mut options = vec![&COMPLETE_COMMAND_OPTION];
@@ -587,6 +902,7 @@ impl CommandAction {
             CommandAction::Add(EntryKind::Task) => Some(":t"),
             CommandAction::Add(EntryKind::Raw) => None,
             CommandAction::Quit => Some(":q"),
+            CommandAction::Split => Some(":split"),
             CommandAction::Complete => Some(":x"),
             CommandAction::Cancel => Some(":c"),
         }
@@ -696,7 +1012,9 @@ fn command_from_search_input(
 
     let input = format!(":{query}");
     match parse_command(&input).ok()? {
-        Command::Add(_, _) | Command::Quit => Some((input, CommandContext::CommandPane)),
+        Command::Add(_, _) | Command::Quit | Command::ToggleSplit => {
+            Some((input, CommandContext::CommandPane))
+        }
         Command::Complete | Command::Cancel if context == CommandContext::JournalPane => {
             Some((input, CommandContext::JournalPane))
         }
@@ -717,6 +1035,7 @@ pub fn parse_command(input: &str) -> Result<Command, String> {
         ":f" => entry_command(EntryKind::Feeling, rest),
         ":t" => entry_command(EntryKind::Task, rest),
         ":q" => Ok(Command::Quit),
+        ":split" => Ok(Command::ToggleSplit),
         ":x" => Ok(Command::Complete),
         ":c" => Ok(Command::Cancel),
         _ => Err(format!("Unknown command: {command}")),
@@ -810,6 +1129,10 @@ mod tests {
         app.handle_key(key(KeyCode::Enter))
     }
 
+    fn toggle_split(app: &mut App) -> io::Result<()> {
+        run_journal_search(app, "split")
+    }
+
     #[test]
     fn parses_entry_commands() {
         assert_eq!(
@@ -833,6 +1156,7 @@ mod tests {
     #[test]
     fn parses_navigation_and_action_commands() {
         assert_eq!(parse_command(":q").unwrap(), Command::Quit);
+        assert_eq!(parse_command(":split").unwrap(), Command::ToggleSplit);
         assert_eq!(parse_command(":x").unwrap(), Command::Complete);
         assert_eq!(parse_command(":c").unwrap(), Command::Cancel);
     }
@@ -936,6 +1260,231 @@ mod tests {
     }
 
     #[test]
+    fn toggles_split_view_on_for_yesterday_and_today() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("2026-05-20.md"), "- yesterday note\n")?;
+        fs::write(root.join("2026-05-21.md"), "- today note\n")?;
+
+        toggle_split(&mut app)?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.newer.journal.date, date());
+        assert_eq!(split.active, SplitPane::Newer);
+        assert_eq!(app.journal.date, date());
+        assert_eq!(app.selected, Some(0));
+        assert_eq!(split.older.journal.entries[0].text, "yesterday note");
+        assert_eq!(split.newer.journal.entries[0].text, "today note");
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_arrows_focus_and_shift_the_two_day_window() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Left))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Older);
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+
+        app.handle_key(key(KeyCode::Left))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()
+        );
+        assert_eq!(
+            split.newer.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.active, SplitPane::Older);
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()
+        );
+
+        app.handle_key(key(KeyCode::Right))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Newer);
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+
+        app.handle_key(key(KeyCode::Right))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.newer.journal.date, date());
+        assert_eq!(split.active, SplitPane::Newer);
+        assert_eq!(app.journal.date, date());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_keeps_independent_selection_per_pane() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("2026-05-20.md"),
+            "- yesterday one\n- yesterday two\n",
+        )?;
+        fs::write(
+            root.join("2026-05-21.md"),
+            "- today one\n- today two\n- today three\n",
+        )?;
+
+        toggle_split(&mut app)?;
+        assert_eq!(app.selected, Some(2));
+
+        app.handle_key(key(KeyCode::Up))?;
+        assert_eq!(app.selected, Some(1));
+        assert_eq!(
+            app.split.as_ref().expect("split view").newer.selected,
+            Some(1)
+        );
+
+        app.handle_key(key(KeyCode::Left))?;
+        assert_eq!(app.selected, Some(1));
+        app.handle_key(key(KeyCode::Up))?;
+        assert_eq!(app.selected, Some(0));
+        assert_eq!(
+            app.split.as_ref().expect("split view").older.selected,
+            Some(0)
+        );
+
+        app.handle_key(key(KeyCode::Right))?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Newer);
+        assert_eq!(app.selected, Some(1));
+        assert_eq!(split.older.selected, Some(0));
+        assert_eq!(split.newer.selected, Some(1));
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_writes_new_entries_to_focused_pane() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Left))?;
+        run_journal_search(&mut app, "n yesterday add")?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Older);
+        assert_eq!(
+            split.older.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(split.older.journal.entries[0].text, "yesterday add");
+        assert!(split.newer.journal.entries.is_empty());
+        assert_eq!(app.journal.date, split.older.journal.date);
+        assert_eq!(app.selected, Some(0));
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-20.md"))?,
+            "- yesterday add\n"
+        );
+        assert!(!root.join("2026-05-21.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_applies_entry_actions_to_focused_pane() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("2026-05-20.md"), "· old task\n")?;
+        fs::write(root.join("2026-05-21.md"), "· today task\n")?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Left))?;
+        run_journal_search(&mut app, "x")?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Older);
+        assert_eq!(
+            split.older.journal.entries[0].state,
+            crate::journal::EntryState::Completed
+        );
+        assert_eq!(
+            split.newer.journal.entries[0].state,
+            crate::journal::EntryState::Open
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-20.md"))?,
+            "X old task\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "· today task\n"
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn toggling_split_view_off_keeps_the_active_day() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Left))?;
+        toggle_split(&mut app)?;
+
+        assert!(app.split.is_none());
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+
+        app.handle_key(key(KeyCode::Left))?;
+
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_does_not_create_files_for_empty_displayed_days() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        toggle_split(&mut app)?;
+
+        assert!(app.split.is_some());
+        assert!(!root.join("2026-05-20.md").exists());
+        assert!(!root.join("2026-05-21.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
     fn matches_fuzzy_subsequences_case_insensitively() {
         assert!(fuzzy_subsequence_match("nt", "note"));
         assert!(fuzzy_subsequence_match("TD", "todo"));
@@ -953,6 +1502,7 @@ mod tests {
             .into_iter()
             .map(|result| result.name)
             .collect::<Vec<_>>();
+        assert!(all_names.contains(&"split"));
         assert!(!all_names.contains(&"switch to journal"));
         assert!(!all_names.contains(&"yesterday"));
         assert!(!all_names.contains(&"tomorrow"));
