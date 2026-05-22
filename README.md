@@ -16,6 +16,7 @@ The journal pane is focused by default. From the journal pane:
 
 - `:` opens fuzzy command search in the command pane.
 - `Up` and `Down` move the highlighted journal entry.
+- `Left` and `Right` move to the previous or next journal day.
 
 In fuzzy command search:
 

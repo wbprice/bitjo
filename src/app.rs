@@ -1,5 +1,9 @@
-use std::io;
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
+use chrono::Days;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::journal::{EntryKind, Journal};
@@ -118,12 +122,14 @@ pub struct App {
     pub selected: Option<usize>,
     pub status: String,
     pub should_quit: bool,
+    journal_root: PathBuf,
     command_context: CommandContext,
 }
 
 impl App {
     pub fn new(journal: Journal) -> Self {
         let selected = last_entry_index(&journal);
+        let journal_root = journal_root(&journal);
 
         Self {
             journal,
@@ -134,6 +140,7 @@ impl App {
             selected,
             status: String::from("Ready."),
             should_quit: false,
+            journal_root,
             command_context: CommandContext::CommandPane,
         }
     }
@@ -236,6 +243,8 @@ impl App {
             KeyCode::Esc => self.focus_journal(),
             KeyCode::Up => self.select_previous(),
             KeyCode::Down => self.select_next(),
+            KeyCode::Left => self.switch_to_previous_day(),
+            KeyCode::Right => self.switch_to_next_day(),
             KeyCode::Char(':') if is_text_input(key.modifiers) => {
                 self.open_command_search(CommandContext::JournalPane);
             }
@@ -243,6 +252,39 @@ impl App {
         }
 
         Ok(())
+    }
+
+    fn switch_to_previous_day(&mut self) {
+        let Some(date) = self.journal.date.checked_sub_days(Days::new(1)) else {
+            self.status = String::from("Cannot switch before the supported date range.");
+            return;
+        };
+
+        self.switch_to_day(date);
+    }
+
+    fn switch_to_next_day(&mut self) {
+        let Some(date) = self.journal.date.checked_add_days(Days::new(1)) else {
+            self.status = String::from("Cannot switch after the supported date range.");
+            return;
+        };
+
+        self.switch_to_day(date);
+    }
+
+    fn switch_to_day(&mut self, date: chrono::NaiveDate) {
+        match Journal::load_for_date(&self.journal_root, date) {
+            Ok(journal) => {
+                self.journal = journal;
+                self.selected = last_entry_index(&self.journal);
+                self.reset_command_pane();
+                self.focus = Focus::Journal;
+                self.status = format!("Loaded {}.", self.journal.date.format("%Y-%m-%d"));
+            }
+            Err(error) => {
+                self.status = format!("Could not load {}: {error}", date.format("%Y-%m-%d"));
+            }
+        }
     }
 
     fn open_command_search(&mut self, context: CommandContext) {
@@ -704,6 +746,14 @@ fn last_entry_index(journal: &Journal) -> Option<usize> {
     journal.entries.len().checked_sub(1)
 }
 
+fn journal_root(journal: &Journal) -> PathBuf {
+    journal
+        .path()
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -807,6 +857,85 @@ mod tests {
     }
 
     #[test]
+    fn switches_between_journal_days_with_left_and_right_arrows() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("2026-05-20.md"),
+            "- yesterday note\n· yesterday task\n",
+        )?;
+
+        app.handle_key(key(KeyCode::Left))?;
+
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 20).unwrap()
+        );
+        assert_eq!(app.journal.entries.len(), 2);
+        assert_eq!(app.journal.entries[0].text, "yesterday note");
+        assert_eq!(app.journal.entries[1].text, "yesterday task");
+        assert_eq!(app.selected, Some(1));
+        assert_eq!(app.focus, Focus::Journal);
+        assert_eq!(app.status, "Loaded 2026-05-20.");
+
+        app.handle_key(key(KeyCode::Right))?;
+
+        assert_eq!(app.journal.date, date());
+        assert!(app.journal.entries.is_empty());
+        assert_eq!(app.selected, None);
+        assert!(!root.join("2026-05-21.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn switching_to_empty_day_does_not_create_file() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        app.handle_key(key(KeyCode::Right))?;
+
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 22).unwrap()
+        );
+        assert!(app.journal.entries.is_empty());
+        assert_eq!(app.selected, None);
+        assert!(!root.join("2026-05-22.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn writes_new_entries_to_displayed_day() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+
+        app.handle_key(key(KeyCode::Right))?;
+        app.handle_key(key(KeyCode::Char(':')))?;
+        type_text(&mut app, "n future note")?;
+        app.handle_key(key(KeyCode::Enter))?;
+
+        assert_eq!(
+            app.journal.date,
+            NaiveDate::from_ymd_opt(2026, 5, 22).unwrap()
+        );
+        assert_eq!(app.journal.entries.len(), 1);
+        assert_eq!(
+            app.journal.entries[0].created_on,
+            NaiveDate::from_ymd_opt(2026, 5, 22).unwrap()
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-22.md"))?,
+            "- future note\n"
+        );
+        assert!(!root.join("2026-05-21.md").exists());
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
     fn matches_fuzzy_subsequences_case_insensitively() {
         assert!(fuzzy_subsequence_match("nt", "note"));
         assert!(fuzzy_subsequence_match("TD", "todo"));
@@ -825,6 +954,8 @@ mod tests {
             .map(|result| result.name)
             .collect::<Vec<_>>();
         assert!(!all_names.contains(&"switch to journal"));
+        assert!(!all_names.contains(&"yesterday"));
+        assert!(!all_names.contains(&"tomorrow"));
         assert!(!all_names.contains(&"complete"));
         assert!(!all_names.contains(&"cancel"));
     }
