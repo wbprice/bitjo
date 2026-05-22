@@ -54,7 +54,7 @@ impl JournalEntry {
             EntryKind::Event => format!("◦ {}", self.render_text()),
             EntryKind::Feeling => format!("= {}", self.text),
             EntryKind::Task => match self.state {
-                EntryState::Completed => format!("X {}", self.render_text()),
+                EntryState::Completed => format!("X {}", self.text),
                 EntryState::Open | EntryState::Cancelled => format!("· {}", self.render_text()),
             },
             EntryKind::Raw => self.text.clone(),
@@ -62,7 +62,7 @@ impl JournalEntry {
     }
 
     pub fn is_struck(&self) -> bool {
-        matches!(self.state, EntryState::Completed | EntryState::Cancelled)
+        matches!(self.state, EntryState::Cancelled)
     }
 
     pub fn toggle_complete(&mut self) -> Result<&'static str, &'static str> {
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn renders_markdown_symbols_and_strikethrough() {
+    fn renders_markdown_symbols_and_strikes_only_cancelled_entries() {
         let note = JournalEntry::new(EntryKind::Note, "plain note", date());
         assert_eq!(note.to_markdown_line(), "- plain note");
 
@@ -292,12 +292,15 @@ mod tests {
 
         let mut completed = JournalEntry::new(EntryKind::Task, "done", date());
         completed.state = EntryState::Completed;
-        assert_eq!(completed.to_markdown_line(), "X ~~done~~");
+        assert_eq!(completed.to_markdown_line(), "X done");
     }
 
     #[test]
     fn parses_markdown_entries() {
-        let entries = parse_markdown("- note\n◦ ~~event~~\n= mood\n· task\nX ~~done~~\n", date());
+        let entries = parse_markdown(
+            "- note\n◦ ~~event~~\n= mood\n· task\nX done\nX ~~legacy done~~\n",
+            date(),
+        );
 
         assert_eq!(entries[0].kind, EntryKind::Note);
         assert_eq!(entries[1].state, EntryState::Cancelled);
@@ -306,6 +309,34 @@ mod tests {
         assert_eq!(entries[3].state, EntryState::Open);
         assert_eq!(entries[4].state, EntryState::Completed);
         assert_eq!(entries[4].text, "done");
+        assert_eq!(entries[5].state, EntryState::Completed);
+        assert_eq!(entries[5].text, "legacy done");
+    }
+
+    #[test]
+    fn normalizes_legacy_completed_task_markdown_on_save() -> io::Result<()> {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!("bullet-journal-tui-test-{unique}"));
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("2026-05-21.md"),
+            "X ~~done~~\n· ~~cancelled task~~\n◦ ~~cancelled event~~\n",
+        )?;
+
+        let journal = Journal::load_for_date(&root, date())?;
+        journal.save()?;
+
+        let saved = fs::read_to_string(root.join("2026-05-21.md"))?;
+        assert_eq!(
+            saved,
+            "X done\n· ~~cancelled task~~\n◦ ~~cancelled event~~\n"
+        );
+
+        fs::remove_dir_all(root)?;
+        Ok(())
     }
 
     #[test]

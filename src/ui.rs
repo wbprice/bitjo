@@ -188,7 +188,7 @@ mod tests {
 
     use crate::{
         app::{CommandPaneMode, Focus},
-        journal::Journal,
+        journal::{EntryKind, EntryState, Journal},
     };
 
     fn date() -> NaiveDate {
@@ -216,10 +216,14 @@ mod tests {
     }
 
     fn render_text(app: &App) -> io::Result<String> {
+        Ok(buffer_text(&render_buffer(app)?))
+    }
+
+    fn render_buffer(app: &App) -> io::Result<Buffer> {
         let backend = TestBackend::new(80, 20);
         let mut terminal = Terminal::new(backend)?;
         terminal.draw(|frame| draw(frame, app))?;
-        Ok(buffer_text(terminal.backend().buffer()))
+        Ok(terminal.backend().buffer().clone())
     }
 
     fn buffer_text(buffer: &Buffer) -> String {
@@ -234,6 +238,41 @@ mod tests {
         }
 
         text
+    }
+
+    fn modifier_for_text(buffer: &Buffer, needle: &str) -> Modifier {
+        let width = buffer.area.width as usize;
+
+        for (row_index, row) in buffer.content().chunks(width).enumerate() {
+            let row_text = row.iter().map(|cell| cell.symbol()).collect::<String>();
+            if let Some(byte_col) = row_text.find(needle) {
+                let col = row_text[..byte_col].chars().count() as u16;
+                return buffer[(col, row_index as u16)].modifier;
+            }
+        }
+
+        panic!("rendered buffer did not contain {needle:?}");
+    }
+
+    #[test]
+    fn strikes_cancelled_entries_but_not_completed_tasks() -> io::Result<()> {
+        let root = test_root();
+        let mut journal = Journal::load_for_date(&root, date())?;
+        journal.add_entry(EntryKind::Task, "completed task");
+        journal.entries[0].state = EntryState::Completed;
+        journal.add_entry(EntryKind::Task, "cancelled task");
+        journal.entries[1].state = EntryState::Cancelled;
+
+        let mut app = App::new(journal);
+        app.focus = Focus::Command;
+
+        let buffer = render_buffer(&app)?;
+
+        assert!(!modifier_for_text(&buffer, "completed task").contains(Modifier::CROSSED_OUT));
+        assert!(modifier_for_text(&buffer, "cancelled task").contains(Modifier::CROSSED_OUT));
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
     }
 
     #[test]

@@ -4,6 +4,9 @@
 
 Implemented MVP.
 
+Correction: completed-task strikethrough behavior is superseded by
+[Completed Tasks No Strikethrough](../bugs/CompletedTasksNoStrikethrough.md).
+
 ## Purpose & User Problem
 
 Build a terminal user interface for people who are already comfortable in TUIs
