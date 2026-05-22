@@ -312,8 +312,8 @@ impl App {
             KeyCode::Left => self.navigate_left()?,
             KeyCode::Char('h') if is_unmodified_key(key.modifiers) => self.navigate_left()?,
             KeyCode::Right => self.navigate_right()?,
-            KeyCode::Char(character) if opens_journal_command_search(character, key.modifiers) => {
             KeyCode::Char('l') if is_unmodified_key(key.modifiers) => self.navigate_right()?,
+            KeyCode::Char(character) if opens_journal_command_search(character, key.modifiers) => {
                 self.open_command_search(CommandContext::JournalPane);
             }
             _ => {}
