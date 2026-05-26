@@ -31,6 +31,33 @@ pub enum CommandAction {
     Important,
 }
 
+impl CommandAction {
+    fn token(self) -> Option<&'static str> {
+        match self {
+            CommandAction::Add(EntryKind::Note) => Some(":n"),
+            CommandAction::Add(EntryKind::Event) => Some(":e"),
+            CommandAction::Add(EntryKind::Feeling) => Some(":f"),
+            CommandAction::Add(EntryKind::Task) => Some(":t"),
+            CommandAction::Add(EntryKind::Raw) => None,
+            CommandAction::Quit => Some(":q"),
+            CommandAction::Split => Some(":split"),
+            CommandAction::Complete => Some(":x"),
+            CommandAction::Cancel => Some(":c"),
+            CommandAction::Important => Some(":i"),
+        }
+    }
+
+    fn entry_title(self) -> &'static str {
+        match self {
+            CommandAction::Add(EntryKind::Note) => "Enter a note",
+            CommandAction::Add(EntryKind::Event) => "Enter an event",
+            CommandAction::Add(EntryKind::Feeling) => "Enter a feeling",
+            CommandAction::Add(EntryKind::Task) => "Enter a task",
+            _ => "Command",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
     Add(EntryKind, String),
@@ -196,6 +223,7 @@ pub struct App {
     command_context: CommandContext,
 }
 
+// App construction and top-level input routing.
 impl App {
     pub fn new(journal: Journal) -> Self {
         let selected = last_entry_index(&journal);
@@ -330,7 +358,10 @@ impl App {
 
         Ok(())
     }
+}
 
+// Journal focus and date navigation.
+impl App {
     fn navigate_left(&mut self) -> io::Result<()> {
         if self.split.is_some() {
             self.navigate_split_left()
@@ -395,7 +426,10 @@ impl App {
         self.focus = Focus::Journal;
         self.status = String::from("Journal pane focused.");
     }
+}
 
+// Command selection and execution.
+impl App {
     fn execute_command_from_search_input(&mut self) -> io::Result<bool> {
         if let Some((input, context)) =
             command_from_search_input(&self.command_input, self.command_context)
@@ -508,7 +542,10 @@ impl App {
 
         Ok(())
     }
+}
 
+// Split journal view management.
+impl App {
     fn toggle_split_view(&mut self) {
         if let Some(split) = self.split.take() {
             let pane = match split.active {
@@ -650,7 +687,10 @@ impl App {
         self.sync_active_journal_from_split();
         self.status = format!("Focused {}.", self.journal.date.format("%Y-%m-%d"));
     }
+}
 
+// Journal entry mutation and selection.
+impl App {
     fn add_entry_to_active_journal(
         &mut self,
         kind: EntryKind,
@@ -820,7 +860,10 @@ impl App {
             self.selected = split.active_pane().selected;
         }
     }
+}
 
+// UI-facing state for split panes and command search.
+impl App {
     pub fn split_view(&self) -> Option<&SplitJournalView> {
         self.split.as_ref()
     }
@@ -933,33 +976,6 @@ impl App {
             EntryKind::Note | EntryKind::Feeling | EntryKind::Raw => {
                 vec![&IMPORTANT_COMMAND_OPTION]
             }
-        }
-    }
-}
-
-impl CommandAction {
-    fn token(self) -> Option<&'static str> {
-        match self {
-            CommandAction::Add(EntryKind::Note) => Some(":n"),
-            CommandAction::Add(EntryKind::Event) => Some(":e"),
-            CommandAction::Add(EntryKind::Feeling) => Some(":f"),
-            CommandAction::Add(EntryKind::Task) => Some(":t"),
-            CommandAction::Add(EntryKind::Raw) => None,
-            CommandAction::Quit => Some(":q"),
-            CommandAction::Split => Some(":split"),
-            CommandAction::Complete => Some(":x"),
-            CommandAction::Cancel => Some(":c"),
-            CommandAction::Important => Some(":i"),
-        }
-    }
-
-    fn entry_title(self) -> &'static str {
-        match self {
-            CommandAction::Add(EntryKind::Note) => "Enter a note",
-            CommandAction::Add(EntryKind::Event) => "Enter an event",
-            CommandAction::Add(EntryKind::Feeling) => "Enter a feeling",
-            CommandAction::Add(EntryKind::Task) => "Enter a task",
-            _ => "Command",
         }
     }
 }

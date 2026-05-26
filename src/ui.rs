@@ -111,6 +111,54 @@ fn draw_journal(
     frame.render_stateful_widget(list, area, &mut state);
 }
 
+fn entry_item(entry: &JournalEntry) -> ListItem<'static> {
+    let symbol = match entry.kind {
+        EntryKind::Note => "-",
+        EntryKind::Event => "◦",
+        EntryKind::Feeling => "=",
+        EntryKind::Task => {
+            if entry.state == crate::journal::EntryState::Completed {
+                "X"
+            } else {
+                "·"
+            }
+        }
+        EntryKind::Raw => "",
+    };
+
+    let text_style = if entry.is_struck() {
+        Style::default().add_modifier(Modifier::CROSSED_OUT)
+    } else {
+        Style::default()
+    };
+
+    let mut spans = Vec::new();
+    if entry.important {
+        spans.push(Span::styled(
+            "*",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" "));
+    } else {
+        spans.push(Span::raw("  "));
+    }
+
+    if entry.kind == EntryKind::Raw {
+        spans.push(Span::styled(entry.text.clone(), text_style));
+    } else {
+        spans.push(Span::styled(
+            symbol.to_string(),
+            Style::default().fg(Color::Yellow),
+        ));
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled(entry.text.clone(), text_style));
+    }
+
+    ListItem::new(Line::from(spans))
+}
+
 fn draw_command(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     let is_focused = matches!(app.focus, Focus::Command);
     let title = match app.focus {
@@ -183,54 +231,6 @@ fn command_pane_height(app: &App) -> u16 {
     } else {
         3
     }
-}
-
-fn entry_item(entry: &JournalEntry) -> ListItem<'static> {
-    let symbol = match entry.kind {
-        EntryKind::Note => "-",
-        EntryKind::Event => "◦",
-        EntryKind::Feeling => "=",
-        EntryKind::Task => {
-            if entry.state == crate::journal::EntryState::Completed {
-                "X"
-            } else {
-                "·"
-            }
-        }
-        EntryKind::Raw => "",
-    };
-
-    let text_style = if entry.is_struck() {
-        Style::default().add_modifier(Modifier::CROSSED_OUT)
-    } else {
-        Style::default()
-    };
-
-    let mut spans = Vec::new();
-    if entry.important {
-        spans.push(Span::styled(
-            "*",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ));
-        spans.push(Span::raw(" "));
-    } else {
-        spans.push(Span::raw("  "));
-    }
-
-    if entry.kind == EntryKind::Raw {
-        spans.push(Span::styled(entry.text.clone(), text_style));
-    } else {
-        spans.push(Span::styled(
-            symbol.to_string(),
-            Style::default().fg(Color::Yellow),
-        ));
-        spans.push(Span::raw(" "));
-        spans.push(Span::styled(entry.text.clone(), text_style));
-    }
-
-    ListItem::new(Line::from(spans))
 }
 
 fn border_style(is_focused: bool) -> Style {
