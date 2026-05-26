@@ -26,6 +26,7 @@ pub struct JournalEntry {
     pub kind: EntryKind,
     pub text: String,
     pub state: EntryState,
+    pub important: bool,
     pub created_on: NaiveDate,
 }
 
@@ -35,6 +36,7 @@ impl JournalEntry {
             kind,
             text: text.into(),
             state: EntryState::Open,
+            important: false,
             created_on,
         }
     }
@@ -44,12 +46,13 @@ impl JournalEntry {
             kind: EntryKind::Raw,
             text: line.into(),
             state: EntryState::Open,
+            important: false,
             created_on,
         }
     }
 
     pub fn to_markdown_line(&self) -> String {
-        match self.kind {
+        let line = match self.kind {
             EntryKind::Note => format!("- {}", self.text),
             EntryKind::Event => format!("◦ {}", self.render_text()),
             EntryKind::Feeling => format!("= {}", self.text),
@@ -58,6 +61,12 @@ impl JournalEntry {
                 EntryState::Open | EntryState::Cancelled => format!("· {}", self.render_text()),
             },
             EntryKind::Raw => self.text.clone(),
+        };
+
+        if self.important {
+            format!("* {line}")
+        } else {
+            format!("  {line}")
         }
     }
 
@@ -100,6 +109,16 @@ impl JournalEntry {
                 })
             }
             _ => Err("Only tasks and events can be cancelled."),
+        }
+    }
+
+    pub fn toggle_important(&mut self) -> &'static str {
+        self.important = !self.important;
+
+        if self.important {
+            "Entry marked important."
+        } else {
+            "Entry unmarked important."
         }
     }
 
@@ -180,13 +199,24 @@ pub fn parse_markdown(contents: &str, date: NaiveDate) -> Vec<JournalEntry> {
 }
 
 pub fn parse_markdown_line(line: &str, date: NaiveDate) -> JournalEntry {
+    let (important, line) = match line.strip_prefix("* ") {
+        Some(rest) => (true, rest),
+        None => match line.strip_prefix("  ") {
+            Some(rest) => (false, rest),
+            None => (false, line),
+        },
+    };
+
     if let Some(rest) = line.strip_prefix("- ") {
-        return JournalEntry::new(EntryKind::Note, rest, date);
+        let mut entry = JournalEntry::new(EntryKind::Note, rest, date);
+        entry.important = important;
+        return entry;
     }
 
     if let Some(rest) = line.strip_prefix("◦ ") {
         let (cancelled, text) = unwrap_strikethrough(rest);
         let mut entry = JournalEntry::new(EntryKind::Event, text, date);
+        entry.important = important;
         if cancelled {
             entry.state = EntryState::Cancelled;
         }
@@ -194,12 +224,15 @@ pub fn parse_markdown_line(line: &str, date: NaiveDate) -> JournalEntry {
     }
 
     if let Some(rest) = line.strip_prefix("= ") {
-        return JournalEntry::new(EntryKind::Feeling, rest, date);
+        let mut entry = JournalEntry::new(EntryKind::Feeling, rest, date);
+        entry.important = important;
+        return entry;
     }
 
     if let Some(rest) = line.strip_prefix("· ") {
         let (cancelled, text) = unwrap_strikethrough(rest);
         let mut entry = JournalEntry::new(EntryKind::Task, text, date);
+        entry.important = important;
         if cancelled {
             entry.state = EntryState::Cancelled;
         }
@@ -209,11 +242,14 @@ pub fn parse_markdown_line(line: &str, date: NaiveDate) -> JournalEntry {
     if let Some(rest) = line.strip_prefix("X ") {
         let (_, text) = unwrap_strikethrough(rest);
         let mut entry = JournalEntry::new(EntryKind::Task, text, date);
+        entry.important = important;
         entry.state = EntryState::Completed;
         return entry;
     }
 
-    JournalEntry::raw(line, date)
+    let mut entry = JournalEntry::raw(line, date);
+    entry.important = important;
+    entry
 }
 
 pub fn format_journal_title(date: NaiveDate) -> String {
@@ -278,25 +314,68 @@ mod tests {
     #[test]
     fn renders_markdown_symbols_and_strikes_only_cancelled_entries() {
         let note = JournalEntry::new(EntryKind::Note, "plain note", date());
-        assert_eq!(note.to_markdown_line(), "- plain note");
+        assert_eq!(note.to_markdown_line(), "  - plain note");
 
         let mut event = JournalEntry::new(EntryKind::Event, "cancelled event", date());
         event.state = EntryState::Cancelled;
-        assert_eq!(event.to_markdown_line(), "◦ ~~cancelled event~~");
+        assert_eq!(event.to_markdown_line(), "  ◦ ~~cancelled event~~");
 
         let feeling = JournalEntry::new(EntryKind::Feeling, "accomplished", date());
-        assert_eq!(feeling.to_markdown_line(), "= accomplished");
+        assert_eq!(feeling.to_markdown_line(), "  = accomplished");
 
         let task = JournalEntry::new(EntryKind::Task, "open task", date());
-        assert_eq!(task.to_markdown_line(), "· open task");
+        assert_eq!(task.to_markdown_line(), "  · open task");
 
         let mut completed = JournalEntry::new(EntryKind::Task, "done", date());
         completed.state = EntryState::Completed;
-        assert_eq!(completed.to_markdown_line(), "X done");
+        assert_eq!(completed.to_markdown_line(), "  X done");
+    }
+
+    #[test]
+    fn renders_important_markdown_prefix_before_existing_symbols() {
+        let mut note = JournalEntry::new(EntryKind::Note, "plain note", date());
+        note.important = true;
+        assert_eq!(note.to_markdown_line(), "* - plain note");
+
+        let mut event = JournalEntry::new(EntryKind::Event, "cancelled event", date());
+        event.important = true;
+        event.state = EntryState::Cancelled;
+        assert_eq!(event.to_markdown_line(), "* ◦ ~~cancelled event~~");
+
+        let mut feeling = JournalEntry::new(EntryKind::Feeling, "accomplished", date());
+        feeling.important = true;
+        assert_eq!(feeling.to_markdown_line(), "* = accomplished");
+
+        let mut task = JournalEntry::new(EntryKind::Task, "open task", date());
+        task.important = true;
+        assert_eq!(task.to_markdown_line(), "* · open task");
+
+        let mut completed = JournalEntry::new(EntryKind::Task, "done", date());
+        completed.important = true;
+        completed.state = EntryState::Completed;
+        assert_eq!(completed.to_markdown_line(), "* X done");
     }
 
     #[test]
     fn parses_markdown_entries() {
+        let entries = parse_markdown(
+            "  - note\n  ◦ ~~event~~\n  = mood\n  · task\n  X done\n  X ~~legacy done~~\n",
+            date(),
+        );
+
+        assert_eq!(entries[0].kind, EntryKind::Note);
+        assert_eq!(entries[1].state, EntryState::Cancelled);
+        assert_eq!(entries[2].kind, EntryKind::Feeling);
+        assert_eq!(entries[3].kind, EntryKind::Task);
+        assert_eq!(entries[3].state, EntryState::Open);
+        assert_eq!(entries[4].state, EntryState::Completed);
+        assert_eq!(entries[4].text, "done");
+        assert_eq!(entries[5].state, EntryState::Completed);
+        assert_eq!(entries[5].text, "legacy done");
+    }
+
+    #[test]
+    fn parses_legacy_unprefixed_markdown_entries() {
         let entries = parse_markdown(
             "- note\n◦ ~~event~~\n= mood\n· task\nX done\nX ~~legacy done~~\n",
             date(),
@@ -311,6 +390,32 @@ mod tests {
         assert_eq!(entries[4].text, "done");
         assert_eq!(entries[5].state, EntryState::Completed);
         assert_eq!(entries[5].text, "legacy done");
+    }
+
+    #[test]
+    fn parses_important_markdown_entries() {
+        let entries = parse_markdown(
+            "* - note\n* ◦ ~~event~~\n* = mood\n* · task\n* X done\n* raw line\n",
+            date(),
+        );
+
+        assert_eq!(entries[0].kind, EntryKind::Note);
+        assert!(entries[0].important);
+        assert_eq!(entries[1].kind, EntryKind::Event);
+        assert!(entries[1].important);
+        assert_eq!(entries[1].state, EntryState::Cancelled);
+        assert_eq!(entries[2].kind, EntryKind::Feeling);
+        assert!(entries[2].important);
+        assert_eq!(entries[3].kind, EntryKind::Task);
+        assert!(entries[3].important);
+        assert_eq!(entries[3].state, EntryState::Open);
+        assert_eq!(entries[4].kind, EntryKind::Task);
+        assert!(entries[4].important);
+        assert_eq!(entries[4].state, EntryState::Completed);
+        assert_eq!(entries[4].text, "done");
+        assert_eq!(entries[5].kind, EntryKind::Raw);
+        assert!(entries[5].important);
+        assert_eq!(entries[5].text, "raw line");
     }
 
     #[test]
@@ -332,7 +437,7 @@ mod tests {
         let saved = fs::read_to_string(root.join("2026-05-21.md"))?;
         assert_eq!(
             saved,
-            "X done\n· ~~cancelled task~~\n◦ ~~cancelled event~~\n"
+            "  X done\n  · ~~cancelled task~~\n  ◦ ~~cancelled event~~\n"
         );
 
         fs::remove_dir_all(root)?;
@@ -369,6 +474,22 @@ mod tests {
     }
 
     #[test]
+    fn toggles_importance_independently_from_entry_state() {
+        let mut task = JournalEntry::new(EntryKind::Task, "ship", date());
+        task.state = EntryState::Completed;
+
+        assert_eq!(task.toggle_important(), "Entry marked important.");
+        assert!(task.important);
+        assert_eq!(task.state, EntryState::Completed);
+        assert_eq!(task.to_markdown_line(), "* X ship");
+
+        assert_eq!(task.toggle_important(), "Entry unmarked important.");
+        assert!(!task.important);
+        assert_eq!(task.state, EntryState::Completed);
+        assert_eq!(task.to_markdown_line(), "  X ship");
+    }
+
+    #[test]
     fn persists_journal_file_after_changes() -> io::Result<()> {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -381,7 +502,7 @@ mod tests {
         journal.save()?;
 
         let saved = fs::read_to_string(root.join("2026-05-21.md"))?;
-        assert_eq!(saved, "· persist this\n");
+        assert_eq!(saved, "  · persist this\n");
 
         fs::remove_dir_all(root)?;
         Ok(())
