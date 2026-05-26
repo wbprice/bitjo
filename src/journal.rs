@@ -50,7 +50,10 @@ impl JournalEntry {
             created_on,
         }
     }
+}
 
+// Markdown rendering for journal entries.
+impl JournalEntry {
     pub fn to_markdown_line(&self) -> String {
         let line = match self.kind {
             EntryKind::Note => format!("- {}", self.text),
@@ -74,6 +77,17 @@ impl JournalEntry {
         matches!(self.state, EntryState::Cancelled)
     }
 
+    fn render_text(&self) -> String {
+        if self.is_struck() {
+            format!("~~{}~~", self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+}
+
+// Entry state transitions.
+impl JournalEntry {
     pub fn toggle_complete(&mut self) -> Result<&'static str, &'static str> {
         if self.kind != EntryKind::Task {
             return Err("Only tasks can be completed.");
@@ -121,14 +135,6 @@ impl JournalEntry {
             "Entry unmarked important."
         }
     }
-
-    fn render_text(&self) -> String {
-        if self.is_struck() {
-            format!("~~{}~~", self.text)
-        } else {
-            self.text.clone()
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -154,7 +160,10 @@ impl Journal {
             path,
         })
     }
+}
 
+// Journal mutation and persistence.
+impl Journal {
     pub fn add_entry(&mut self, kind: EntryKind, text: impl Into<String>) {
         self.entries.push(JournalEntry::new(kind, text, self.date));
     }
@@ -181,7 +190,10 @@ impl Journal {
         markdown.push('\n');
         markdown
     }
+}
 
+// Journal metadata.
+impl Journal {
     pub fn path(&self) -> &Path {
         &self.path
     }
