@@ -28,6 +28,7 @@ pub enum CommandAction {
     Split,
     Complete,
     Cancel,
+    Important,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +38,7 @@ pub enum Command {
     ToggleSplit,
     Complete,
     Cancel,
+    Important,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,6 +171,13 @@ const CANCEL_COMMAND_OPTION: CommandOption = CommandOption {
     token: ":c",
     aliases: &["c", "cancelled"],
     action: CommandAction::Cancel,
+};
+
+const IMPORTANT_COMMAND_OPTION: CommandOption = CommandOption {
+    name: "important",
+    token: ":i",
+    aliases: &["i"],
+    action: CommandAction::Important,
 };
 
 #[derive(Debug)]
@@ -416,7 +425,7 @@ impl App {
                 self.reset_command_pane();
                 self.execute_command(command.token, CommandContext::CommandPane)?;
             }
-            CommandAction::Complete | CommandAction::Cancel => {
+            CommandAction::Complete | CommandAction::Cancel | CommandAction::Important => {
                 self.reset_command_pane();
                 self.execute_command(command.token, CommandContext::JournalPane)?;
             }
@@ -482,6 +491,14 @@ impl App {
                     return Ok(());
                 }
                 self.cancel_selected()?;
+                self.focus = Focus::Journal;
+            }
+            Ok(Command::Important) => {
+                if context != CommandContext::JournalPane {
+                    self.status = String::from("Important is available in the journal pane.");
+                    return Ok(());
+                }
+                self.toggle_important_selected()?;
                 self.focus = Focus::Journal;
             }
             Err(message) => {
@@ -719,6 +736,26 @@ impl App {
         Ok(())
     }
 
+    fn toggle_important_selected(&mut self) -> io::Result<()> {
+        let Some(index) = self.highlighted_entry_index() else {
+            self.status = String::from("No entry selected.");
+            return Ok(());
+        };
+
+        if let Some(split) = &mut self.split {
+            let pane = split.active_pane_mut();
+            self.status = pane.journal.entries[index].toggle_important().to_string();
+            pane.journal.save()?;
+            self.sync_active_journal_from_split();
+            return Ok(());
+        }
+
+        self.status = self.journal.entries[index].toggle_important().to_string();
+        self.journal.save()?;
+
+        Ok(())
+    }
+
     fn highlighted_entry_index(&self) -> Option<usize> {
         let index = self.active_selected()?;
         (index < self.active_journal().entries.len()).then_some(index)
@@ -889,10 +926,13 @@ impl App {
                 if entry.state != crate::journal::EntryState::Completed {
                     options.push(&CANCEL_COMMAND_OPTION);
                 }
+                options.push(&IMPORTANT_COMMAND_OPTION);
                 options
             }
-            EntryKind::Event => vec![&CANCEL_COMMAND_OPTION],
-            EntryKind::Note | EntryKind::Feeling | EntryKind::Raw => Vec::new(),
+            EntryKind::Event => vec![&CANCEL_COMMAND_OPTION, &IMPORTANT_COMMAND_OPTION],
+            EntryKind::Note | EntryKind::Feeling | EntryKind::Raw => {
+                vec![&IMPORTANT_COMMAND_OPTION]
+            }
         }
     }
 }
@@ -909,6 +949,7 @@ impl CommandAction {
             CommandAction::Split => Some(":split"),
             CommandAction::Complete => Some(":x"),
             CommandAction::Cancel => Some(":c"),
+            CommandAction::Important => Some(":i"),
         }
     }
 
@@ -1019,10 +1060,12 @@ fn command_from_search_input(
         Command::Add(_, _) | Command::Quit | Command::ToggleSplit => {
             Some((input, CommandContext::CommandPane))
         }
-        Command::Complete | Command::Cancel if context == CommandContext::JournalPane => {
+        Command::Complete | Command::Cancel | Command::Important
+            if context == CommandContext::JournalPane =>
+        {
             Some((input, CommandContext::JournalPane))
         }
-        Command::Complete | Command::Cancel => None,
+        Command::Complete | Command::Cancel | Command::Important => None,
     }
 }
 
@@ -1042,6 +1085,7 @@ pub fn parse_command(input: &str) -> Result<Command, String> {
         ":split" => Ok(Command::ToggleSplit),
         ":x" => Ok(Command::Complete),
         ":c" => Ok(Command::Cancel),
+        ":i" | ":important" => Ok(Command::Important),
         _ => Err(format!("Unknown command: {command}")),
     }
 }
@@ -1171,6 +1215,8 @@ mod tests {
         assert_eq!(parse_command(":split").unwrap(), Command::ToggleSplit);
         assert_eq!(parse_command(":x").unwrap(), Command::Complete);
         assert_eq!(parse_command(":c").unwrap(), Command::Cancel);
+        assert_eq!(parse_command(":i").unwrap(), Command::Important);
+        assert_eq!(parse_command(":important").unwrap(), Command::Important);
     }
 
     #[test]
@@ -1218,6 +1264,7 @@ mod tests {
         let names = search_result_names(&app);
         assert_eq!(names[0], "complete");
         assert_eq!(names[1], "cancel");
+        assert!(names.contains(&"important"));
 
         let _ = fs::remove_dir_all(root);
         Ok(())
@@ -1357,7 +1404,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-22.md"))?,
-            "- future note\n"
+            "  - future note\n"
         );
         assert!(!root.join("2026-05-21.md").exists());
 
@@ -1582,7 +1629,7 @@ mod tests {
         assert_eq!(app.selected, Some(0));
         assert_eq!(
             fs::read_to_string(root.join("2026-05-20.md"))?,
-            "- yesterday add\n"
+            "  - yesterday add\n"
         );
         assert!(!root.join("2026-05-21.md").exists());
 
@@ -1613,11 +1660,39 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-20.md"))?,
-            "X old task\n"
+            "  X old task\n"
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
             "· today task\n"
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn split_view_toggles_importance_on_focused_pane() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("2026-05-20.md"), "- old note\n")?;
+        fs::write(root.join("2026-05-21.md"), "- today note\n")?;
+
+        toggle_split(&mut app)?;
+        app.handle_key(key(KeyCode::Left))?;
+        run_journal_search(&mut app, "i")?;
+
+        let split = app.split.as_ref().expect("split view should be active");
+        assert_eq!(split.active, SplitPane::Older);
+        assert!(split.older.journal.entries[0].important);
+        assert!(!split.newer.journal.entries[0].important);
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-20.md"))?,
+            "* - old note\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "- today note\n"
         );
 
         let _ = fs::remove_dir_all(root);
@@ -1687,6 +1762,7 @@ mod tests {
         assert!(!all_names.contains(&"tomorrow"));
         assert!(!all_names.contains(&"complete"));
         assert!(!all_names.contains(&"cancel"));
+        assert!(!all_names.contains(&"important"));
     }
 
     #[test]
@@ -1893,6 +1969,7 @@ mod tests {
         let names = search_result_names(&app);
         assert_eq!(names[0], "complete");
         assert_eq!(names[1], "cancel");
+        assert!(names.contains(&"important"));
 
         type_text(&mut app, "complete")?;
         app.handle_key(key(KeyCode::Enter))?;
@@ -1908,7 +1985,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "- keep note\nX ship feature\n"
+            "  - keep note\n  X ship feature\n"
         );
 
         run_journal_search(&mut app, "c")?;
@@ -1920,7 +1997,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "- keep note\nX ship feature\n"
+            "  - keep note\n  X ship feature\n"
         );
 
         let _ = fs::remove_dir_all(root);
@@ -1939,6 +2016,7 @@ mod tests {
 
         let names = search_result_names(&app);
         assert_eq!(names[0], "cancel");
+        assert!(names.contains(&"important"));
         assert!(!names.contains(&"complete"));
 
         type_text(&mut app, "cancel")?;
@@ -1959,7 +2037,7 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "- keep note\n◦ ~~planning~~\n· ship feature\n"
+            "  - keep note\n  ◦ ~~planning~~\n  · ship feature\n"
         );
 
         let _ = fs::remove_dir_all(root);
@@ -1967,7 +2045,36 @@ mod tests {
     }
 
     #[test]
-    fn hides_entry_actions_for_notes_and_feelings_and_keeps_them_unchanged() -> io::Result<()> {
+    fn toggles_importance_for_highlighted_entry_and_alias() -> io::Result<()> {
+        let (mut app, root) = test_app()?;
+        app.journal.add_entry(EntryKind::Note, "plain note");
+        app.selected = Some(0);
+
+        run_journal_search(&mut app, "i")?;
+
+        assert_eq!(app.status, "Entry marked important.");
+        assert!(app.journal.entries[0].important);
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "* - plain note\n"
+        );
+
+        run_journal_search(&mut app, "important")?;
+
+        assert_eq!(app.status, "Entry unmarked important.");
+        assert!(!app.journal.entries[0].important);
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "  - plain note\n"
+        );
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn exposes_only_importance_for_notes_and_feelings_and_keeps_invalid_actions_unchanged(
+    ) -> io::Result<()> {
         let (mut app, root) = test_app()?;
         app.journal.add_entry(EntryKind::Note, "plain note");
         app.journal.add_entry(EntryKind::Feeling, "focused");
@@ -1978,6 +2085,7 @@ mod tests {
         app.selected = Some(0);
         app.handle_key(key(KeyCode::Char(':')))?;
         let note_names = search_result_names(&app);
+        assert!(note_names.contains(&"important"));
         assert!(!note_names.contains(&"complete"));
         assert!(!note_names.contains(&"cancel"));
         type_text(&mut app, "x")?;
@@ -1986,6 +2094,7 @@ mod tests {
         app.selected = Some(1);
         app.handle_key(key(KeyCode::Char(':')))?;
         let feeling_names = search_result_names(&app);
+        assert!(feeling_names.contains(&"important"));
         assert!(!feeling_names.contains(&"complete"));
         assert!(!feeling_names.contains(&"cancel"));
         type_text(&mut app, "c")?;
@@ -2026,7 +2135,17 @@ mod tests {
         );
         assert_eq!(
             fs::read_to_string(root.join("2026-05-21.md"))?,
-            "· leave open\n"
+            "  · leave open\n"
+        );
+
+        run_journal_search(&mut app, "i")?;
+
+        assert_eq!(app.status, "No entry selected.");
+        assert_eq!(app.selected, None);
+        assert!(!app.journal.entries[0].important);
+        assert_eq!(
+            fs::read_to_string(root.join("2026-05-21.md"))?,
+            "  · leave open\n"
         );
 
         let _ = fs::remove_dir_all(root);

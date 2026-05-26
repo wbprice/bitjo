@@ -206,17 +206,31 @@ fn entry_item(entry: &JournalEntry) -> ListItem<'static> {
         Style::default()
     };
 
-    let line = if entry.kind == EntryKind::Raw {
-        Line::from(Span::styled(entry.text.clone(), text_style))
+    let mut spans = Vec::new();
+    if entry.important {
+        spans.push(Span::styled(
+            "*",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" "));
     } else {
-        Line::from(vec![
-            Span::styled(symbol.to_string(), Style::default().fg(Color::Yellow)),
-            Span::raw(" "),
-            Span::styled(entry.text.clone(), text_style),
-        ])
-    };
+        spans.push(Span::raw("  "));
+    }
 
-    ListItem::new(line)
+    if entry.kind == EntryKind::Raw {
+        spans.push(Span::styled(entry.text.clone(), text_style));
+    } else {
+        spans.push(Span::styled(
+            symbol.to_string(),
+            Style::default().fg(Color::Yellow),
+        ));
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled(entry.text.clone(), text_style));
+    }
+
+    ListItem::new(Line::from(spans))
 }
 
 fn border_style(is_focused: bool) -> Style {
@@ -372,6 +386,28 @@ mod tests {
 
         assert!(!modifier_for_text(&buffer, "completed task").contains(Modifier::CROSSED_OUT));
         assert!(modifier_for_text(&buffer, "cancelled task").contains(Modifier::CROSSED_OUT));
+
+        let _ = fs::remove_dir_all(root);
+        Ok(())
+    }
+
+    #[test]
+    fn renders_important_prefix_before_entry_symbol() -> io::Result<()> {
+        let root = test_root();
+        let mut journal = Journal::load_for_date(&root, date())?;
+        journal.add_entry(EntryKind::Note, "normal note");
+        journal.add_entry(EntryKind::Note, "important note");
+        journal.entries[1].important = true;
+        journal.add_entry(EntryKind::Task, "important task");
+        journal.entries[2].important = true;
+        journal.entries[2].state = EntryState::Completed;
+
+        let app = App::new(journal);
+        let rendered = render_text(&app)?;
+
+        assert!(rendered.contains("  - normal note"));
+        assert!(rendered.contains("* - important note"));
+        assert!(rendered.contains("* X important task"));
 
         let _ = fs::remove_dir_all(root);
         Ok(())
